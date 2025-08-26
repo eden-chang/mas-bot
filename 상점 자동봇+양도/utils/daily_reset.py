@@ -17,9 +17,16 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 try:
     from config.settings import config
     from utils.logging_config import logger
+    from utils.cache_manager import bot_cache
 except ImportError:
     import logging
     logger = logging.getLogger('daily_reset')
+    
+    # Mock bot_cache for fallback
+    class MockBotCache:
+        def cleanup_old_fortunes(self, kst_timezone=None):
+            return 0
+    bot_cache = MockBotCache()
 
 
 class DailyResetManager:
@@ -34,6 +41,8 @@ class DailyResetManager:
         """
         self.sheets_manager = sheets_manager
         self.is_running = False
+        # KST 타임존 설정
+        self.kst = timezone(timedelta(hours=9))
     
     def reset_confession_counters(self) -> bool:
         """
@@ -97,14 +106,58 @@ class DailyResetManager:
             logger.error(f"일일 자백 카운터 리셋 실패: {e}")
             return False
     
+    def cleanup_old_fortune_cache(self) -> bool:
+        """
+        오래된 운세 캐시 정리 (KST 기준)
+        
+        Returns:
+            bool: 성공 여부
+        """
+        try:
+            cleaned_count = bot_cache.cleanup_old_fortunes(self.kst)
+            if cleaned_count > 0:
+                logger.info(f"일일 운세 캐시 정리 완료: {cleaned_count}개 삭제")
+            else:
+                logger.debug("정리할 오래된 운세 캐시가 없음")
+            return True
+        except Exception as e:
+            logger.error(f"운세 캐시 정리 실패: {e}")
+            return False
+    
+    def daily_midnight_reset(self) -> bool:
+        """
+        매일 자정에 실행되는 리셋 작업
+        
+        Returns:
+            bool: 성공 여부
+        """
+        logger.info("KST 0시 일일 리셋 시작")
+        
+        success_count = 0
+        
+        # 1. 자백 카운터 리셋
+        if self.reset_confession_counters():
+            success_count += 1
+        
+        # 2. 오래된 운세 캐시 정리
+        if self.cleanup_old_fortune_cache():
+            success_count += 1
+        
+        if success_count == 2:
+            logger.info("KST 0시 일일 리셋 모두 완료")
+            return True
+        else:
+            logger.warning(f"KST 0시 일일 리셋 일부 실패: {success_count}/2 성공")
+            return False
+    
     def schedule_daily_reset(self) -> None:
-        """매일 00:00 KST에 자백 카운터 리셋 스케줄링"""
+        """매일 00:00 KST에 일일 리셋 스케줄링"""
         try:
             # 매일 00:00에 리셋 실행 (시스템 시간 기준)
             # KST는 UTC+9이므로, 시스템이 KST로 설정되어 있다고 가정
-            schedule.every().day.at("00:00").do(self.reset_confession_counters)
+            schedule.every().day.at("00:00").do(self.daily_midnight_reset)
             
-            logger.info("일일 자백 카운터 리셋 스케줄 등록 완료 (매일 00:00)")
+            logger.info("일일 리셋 스케줄 등록 완료 (매일 00:00 KST)")
             
         except Exception as e:
             logger.error(f"일일 리셋 스케줄 등록 실패: {e}")
@@ -116,7 +169,7 @@ class DailyResetManager:
             return
         
         self.is_running = True
-        logger.info("일일 리셋 스케줄러 시작")
+        logger.info("일일 리셋 스케줄러 시작 (자백 카운터 + 운세 캐시 정리)")
         
         try:
             while self.is_running:

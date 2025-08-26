@@ -80,6 +80,9 @@ class Config:
     # 캐시 설정
     CACHE_TTL: int = int(os.getenv('CACHE_TTL', '1'))  # 5분
     
+    # 운세 설정
+    FORTUNE_CACHE_ENABLED: bool = os.getenv('FORTUNE_CACHE_ENABLED', 'True').lower() == 'true'
+    
     # 개발/디버그 설정
     DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     ENABLE_CONSOLE_LOG: bool = os.getenv('ENABLE_CONSOLE_LOG', 'True').lower() == 'true'

@@ -313,60 +313,92 @@ class BotCacheManager:
         """
         return self.command_cache.get("help_items")
     
-    def cache_fortune_phrases(self, phrases: List[str]) -> bool:
+    def cache_fortune_phrases(self, phrases: List[str], ttl_hours: int = 1) -> bool:
         """
-        운세 문구 캐싱
+        운세 문구 캐싱 (TTL 지원)
         
         Args:
             phrases: 운세 문구 리스트
+            ttl_hours: 캐시 유지 시간 (시간 단위)
             
         Returns:
             bool: 캐싱 성공 여부
         """
-        return self.command_cache.set("fortune_phrases", phrases)
+        current_time = time.time()
+        expire_time = current_time + (ttl_hours * 60 * 60)
+        
+        cache_data = {
+            'data': phrases,
+            'expire_time': expire_time,
+            'cached_at': current_time
+        }
+        
+        return self.command_cache.set("fortune_phrases_with_ttl", cache_data)
     
     def get_fortune_phrases(self) -> Optional[List[str]]:
         """
-        캐시된 운세 문구 조회
+        캐시된 운세 문구 조회 (TTL 확인)
         
         Returns:
-            Optional[List]: 운세 문구 리스트 또는 None
+            Optional[List]: 운세 문구 리스트 또는 None (만료된 경우)
         """
-        return self.command_cache.get("fortune_phrases")
+        cached_item = self.command_cache.get("fortune_phrases_with_ttl")
+        
+        if cached_item is None:
+            return None
+        
+        current_time = time.time()
+        if current_time > cached_item.get('expire_time', 0):
+            self.command_cache.delete("fortune_phrases_with_ttl")
+            return None
+        
+        return cached_item.get('data')
     
     # BotCacheManager 클래스 내부에 추가할 메서드들
 
-    def cache_today_fortune(self, user_id: str, fortune: str) -> bool:
+    def cache_today_fortune(self, user_id: str, fortune: str, kst_timezone=None) -> bool:
         """
-        오늘의 운세 캐싱
+        오늘의 운세 캐싱 (KST 기준)
         
         Args:
             user_id: 사용자 ID
             fortune: 운세 문구
+            kst_timezone: KST 타임존 객체
             
         Returns:
             bool: 캐싱 성공 여부
         """
-        from datetime import datetime
-        today = datetime.now().strftime('%Y-%m-%d')
+        from datetime import datetime, timezone, timedelta
+        
+        if kst_timezone is None:
+            kst_timezone = timezone(timedelta(hours=9))
+        
+        kst_now = datetime.now(kst_timezone)
+        today = kst_now.strftime('%Y-%m-%d')
         cache_key = f"fortune:{user_id}:{today}"
         return self.user_cache.set(cache_key, fortune)
 
-    def get_today_fortune(self, user_id: str) -> Optional[str]:
+    def get_today_fortune(self, user_id: str, kst_timezone=None) -> Optional[str]:
         """
-        오늘의 운세 조회
+        오늘의 운세 조회 (KST 기준)
         
         Args:
             user_id: 사용자 ID
+            kst_timezone: KST 타임존 객체
             
         Returns:
             Optional[str]: 오늘의 운세 또는 None
         """
-        from datetime import datetime
-        today = datetime.now().strftime('%Y-%m-%d')
+        from datetime import datetime, timezone, timedelta
+        
+        if kst_timezone is None:
+            kst_timezone = timezone(timedelta(hours=9))
+        
+        kst_now = datetime.now(kst_timezone)
+        today = kst_now.strftime('%Y-%m-%d')
         cache_key = f"fortune:{user_id}:{today}"
         return self.user_cache.get(cache_key)
-
+    
     def cache_shop_items(self, shop_items: List[Dict[str, Any]]) -> bool:
         """
         상점 아이템 목록 캐싱
@@ -412,33 +444,38 @@ class BotCacheManager:
         """
         return self.command_cache.delete("shop_items")
 
-    def cleanup_old_fortunes(self) -> int:
+    def cleanup_old_fortunes(self, kst_timezone=None) -> int:
         """
-        오래된 운세 캐시 정리 (어제 이전 것들)
+        오래된 운세 캐시 정리 (KST 기준으로 어제 이전 것들)
         
+        Args:
+            kst_timezone: KST 타임존 객체
+            
         Returns:
             int: 정리된 아이템 수
         """
-        from datetime import datetime, timedelta
-        today = datetime.now().strftime('%Y-%m-%d')
-        yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        from datetime import datetime, timezone, timedelta
         
-        # fortune: 패턴의 키들 중 어제 이전 것들 찾기
+        if kst_timezone is None:
+            kst_timezone = timezone(timedelta(hours=9))
+        
+        kst_now = datetime.now(kst_timezone)
+        today = kst_now.strftime('%Y-%m-%d')
+        
         fortune_keys = [key for key in self.user_cache.get_keys() if key.startswith('fortune:')]
         cleaned_count = 0
         
         for key in fortune_keys:
-            # fortune:user_id:YYYY-MM-DD 형태에서 날짜 추출
             try:
                 date_part = key.split(':')[2]
-                if date_part < today:  # 오늘보다 이전 날짜
+                if date_part < today:
                     if self.user_cache.delete(key):
                         cleaned_count += 1
             except (IndexError, ValueError):
                 continue
         
         if cleaned_count > 0:
-            logger.info(f"오래된 운세 캐시 {cleaned_count}개 정리됨")
+            logger.info(f"오래된 운세 캐시 {cleaned_count}개 정리됨 (KST 기준)")
         
         return cleaned_count
 

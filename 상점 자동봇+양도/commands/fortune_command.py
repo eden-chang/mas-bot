@@ -18,6 +18,7 @@ try:
     from commands.registry import register_command
     from utils.logging_config import logger
     from utils.cache_manager import bot_cache
+    from config.settings import config
 except ImportError:
     import logging
     logger = logging.getLogger('fortune_command')
@@ -65,18 +66,22 @@ class FortuneCommand(BaseCommand):
         super().__init__(**kwargs)
         # KST 타임존
         self.kst = timezone(timedelta(hours=9))
+        # 캐싱 설정 로드
+        self._cache_enabled = self._get_cache_setting()
     
     def execute(self, context: CommandContext) -> CommandResponse:
         """운세 명령어 실행"""
         try:
             user_id = getattr(context, 'user_id', 'unknown_user')
             
-            # 오늘의 운세 캐시 확인
-            cached_fortune = bot_cache.get_today_fortune(user_id)
-            if cached_fortune:
-                return CommandResponse.create_success(cached_fortune)
+            # 캐싱 사용 여부 확인
+            if self._cache_enabled:
+                # 오늘의 운세 캐시 확인
+                cached_fortune = bot_cache.get_today_fortune(user_id, self.kst)
+                if cached_fortune:
+                    return CommandResponse.create_success(cached_fortune)
             
-            # 시트에서 운세 목록 가져오기
+            # 시트에서 운세 목록 가져오기 (1시간 캐시 사용)
             fortune_list = self._get_fortune_list()
             if not fortune_list:
                 return CommandResponse.create_error("운세를 불러올 수 없습니다.")
@@ -84,8 +89,9 @@ class FortuneCommand(BaseCommand):
             # 랜덤 운세 선택
             selected_fortune = random.choice(fortune_list)
             
-            # 캐시에 저장 (24시간)
-            bot_cache.cache_today_fortune(user_id, selected_fortune)
+            # 캐싱 설정에 따라 저장
+            if self._cache_enabled:
+                bot_cache.cache_today_fortune(user_id, selected_fortune, self.kst)
             
             return CommandResponse.create_success(selected_fortune)
             
@@ -94,16 +100,25 @@ class FortuneCommand(BaseCommand):
             return CommandResponse.create_error(f"운세를 가져오는 중 오류가 발생했습니다: {str(e)}")
     
     def _get_fortune_list(self) -> List[str]:
-        """시트에서 운세 목록 가져오기"""
+        """시트에서 운세 목록 가져오기 (1시간 캐시)"""
+        # 먼저 캐시된 운세 문구 조회
+        cached_phrases = bot_cache.get_fortune_phrases()
+        if cached_phrases:
+            logger.debug(f"캐시된 운세 문구 사용: {len(cached_phrases)}개")
+            return cached_phrases
+        
         if not self.sheets_manager:
             logger.warning("SheetsManager가 없어서 더미 운세 사용")
-            return [
+            dummy_fortunes = [
                 "오늘은 좋은 일이 생길 것입니다.",
                 "새로운 기회가 찾아올 것입니다.",
                 "주변 사람들과의 관계가 좋아질 것입니다.",
                 "건강에 주의하세요.",
                 "금전적으로 좋은 소식이 있을 것입니다."
             ]
+            # 더미 데이터도 1시간 캐시
+            bot_cache.cache_fortune_phrases(dummy_fortunes, ttl_hours=1)
+            return dummy_fortunes
         
         try:
             # '운세' 워크시트에서 '문구' 열 가져오기
@@ -121,11 +136,28 @@ class FortuneCommand(BaseCommand):
                         fortune_list.append(fortune_text)
             
             logger.info(f"시트에서 {len(fortune_list)}개의 운세 로드")
+            
+            # 1시간 동안 캐시
+            if fortune_list:
+                bot_cache.cache_fortune_phrases(fortune_list, ttl_hours=1)
+            
             return fortune_list
             
         except Exception as e:
             logger.error(f"시트에서 운세 로드 실패: {e}")
             return []
+    
+    def _get_cache_setting(self) -> bool:
+        """캐시 설정값 가져오기"""
+        try:
+            # config에서 설정값 읽기
+            cache_enabled = getattr(config, 'FORTUNE_CACHE_ENABLED', True)
+            if isinstance(cache_enabled, str):
+                return cache_enabled.lower() in ('true', '1', 'yes', 'on')
+            return bool(cache_enabled)
+        except Exception as e:
+            logger.warning(f"캐시 설정 로드 실패, 기본값 사용: {e}")
+            return True
     
     def _get_today_key(self) -> str:
         """오늘 날짜 키 생성 (KST 기준)"""
