@@ -46,7 +46,7 @@ class Config:
     BASE_DIR = Path(__file__).parent.parent
 
     # 응답 메시지 프리픽스 (이것만 수정하면 모든 응답에 반영!)
-    RESPONSE_PREFIX = "∞ "
+    RESPONSE_PREFIX: str = os.getenv('RESPONSE_PREFIX', '')
     
     # Mastodon API 설정 (이제 환경변수가 로드된 후라서 정상 작동)
     MASTODON_CLIENT_ID: str = os.getenv('MASTODON_CLIENT_ID', '')
@@ -97,7 +97,7 @@ class Config:
     
     # 시스템 키워드 (커스텀 명령어와 구분하기 위함)
     SYSTEM_KEYWORDS = [
-        '도움말', '다이스', '카드 뽑기', '카드뽑기', '운세',]
+        '도움말', '다이스', '카드 뽑기', '카드뽑기', '운세', '소지금 추가', '소지금 차감', '소지금추가', '소지금차감',]
     
     # 에러 메시지 상수
     ERROR_MESSAGES = {

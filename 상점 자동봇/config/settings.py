@@ -46,7 +46,7 @@ class Config:
     BASE_DIR = Path(__file__).parent.parent
 
     # 응답 메시지 프리픽스 (이것만 수정하면 모든 응답에 반영!)
-    RESPONSE_PREFIX = "∞ "
+    RESPONSE_PREFIX: str = os.getenv('RESPONSE_PREFIX', '')
     
     # Mastodon API 설정 (이제 환경변수가 로드된 후라서 정상 작동)
     MASTODON_CLIENT_ID: str = os.getenv('MASTODON_CLIENT_ID', '')
@@ -103,6 +103,7 @@ class Config:
         '소지금', '포인트', '갈레온', '코인', '달러',
         '소지품', '인벤토리', '가방',
         '상점', '마트', '매점', '설명', '사용', '구매',
+        '소지금 추가', '소지금 차감', '소지금추가', '소지금차감',
         ]
     
     # 에러 메시지 상수
