@@ -188,6 +188,10 @@ test_data/
 test_cache.json
 test_credentials.json
 
+# 로그 및 인증 폴더
+logs/
+credentials/
+
 # 개발 중 임시 파일
 scratch/
 notes/

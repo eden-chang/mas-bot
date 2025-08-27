@@ -148,7 +148,7 @@ class SetupChecker:
     def check_google_credentials(self) -> None:
         """Google 인증 파일 확인"""
         # 환경 변수에서 경로 확인
-        cred_path = os.getenv('GOOGLE_CREDENTIALS_PATH', 'credentials.json')
+        cred_path = os.getenv('GOOGLE_CREDENTIALS_PATH', 'credentials/credentials.json')
         
         # 상대 경로인 경우 절대 경로로 변환
         if not os.path.isabs(cred_path):
@@ -228,7 +228,7 @@ class SetupChecker:
             import gspread
             
             # 인증 파일 경로
-            cred_path = os.getenv('GOOGLE_CREDENTIALS_PATH', 'credentials.json')
+            cred_path = os.getenv('GOOGLE_CREDENTIALS_PATH', 'credentials/credentials.json')
             if not os.path.isabs(cred_path):
                 cred_path = os.path.join(os.path.dirname(__file__), cred_path)
             
@@ -305,7 +305,7 @@ class SetupChecker:
             self.warnings.append("현재 디렉토리에 쓰기 권한이 없을 수 있습니다")
         
         # 로그 디렉토리 확인
-        log_path = os.getenv('LOG_FILE_PATH', 'bot.log')
+        log_path = os.getenv('LOG_FILE_PATH', 'logs/bot.log')
         log_dir = Path(log_path).parent
         
         if not log_dir.exists():
@@ -395,7 +395,7 @@ MASTODON_ACCESS_TOKEN=your_access_token_here
 MASTODON_API_BASE_URL=https://your.mastodon.instance
 
 # Google Sheets 설정
-GOOGLE_CREDENTIALS_PATH=credentials.json
+GOOGLE_CREDENTIALS_PATH=credentials/credentials.json
 SHEET_NAME=기본 자동봇 시트
 
 # 봇 설정 (선택사항)
@@ -434,7 +434,7 @@ def show_setup_guide():
    - Google Cloud Console에서 프로젝트 생성
    - Sheets API 활성화
    - 서비스 계정 생성 및 키 다운로드
-   - credentials.json으로 저장
+   - credentials/credentials.json으로 저장
 
 4️⃣ 환경 변수 설정:
    - .env.example을 .env로 복사
@@ -486,10 +486,10 @@ def quick_check():
         print("✅ 환경 변수 OK")
     
     # 인증 파일
-    if os.path.exists('credentials.json'):
+    if os.path.exists('credentials/credentials.json'):
         print("✅ Google 인증 파일 OK")
     else:
-        issues.append("credentials.json 파일 없음")
+        issues.append("credentials/credentials.json 파일 없음")
     
     if issues:
         print(f"\n❌ 발견된 문제 ({len(issues)}개):")

@@ -5,7 +5,8 @@
       "Bash(python:*)",
       "Bash(rg:*)",
       "Bash(findstr:*)",
-      "WebFetch(domain:koltsevaya.xyz)"
+      "WebFetch(domain:koltsevaya.xyz)",
+      "Bash(mkdir:*)"
     ],
     "deny": []
   }

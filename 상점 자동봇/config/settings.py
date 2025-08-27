@@ -57,7 +57,7 @@ class Config:
     # Google Sheets 설정
     GOOGLE_CREDENTIALS_PATH: str = os.getenv(
         'GOOGLE_CREDENTIALS_PATH', 
-        str(BASE_DIR / 'credentials.json')
+        str(BASE_DIR / 'credentials' / 'credentials.json')
     )
     SHEET_NAME: str = os.getenv('SHEET_NAME', '메인 시트')
     
@@ -73,7 +73,7 @@ class Config:
     
     # 로그 설정
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
-    LOG_FILE_PATH: str = os.getenv('LOG_FILE_PATH', 'bot.log')
+    LOG_FILE_PATH: str = os.getenv('LOG_FILE_PATH', str(BASE_DIR / 'logs' / 'bot.log'))
     LOG_MAX_BYTES: int = int(os.getenv('LOG_MAX_BYTES', '10485760'))  # 10MB
     LOG_BACKUP_COUNT: int = int(os.getenv('LOG_BACKUP_COUNT', '5'))
     

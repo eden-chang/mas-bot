@@ -338,7 +338,7 @@ def log_command_usage(user_id: str, username: str, command: str, result: str, su
         }
         
         # 명령어 로그 파일에 기록
-        with open('command_usage.log', 'a', encoding='utf-8') as f:
+        with open('logs/command_usage.log', 'a', encoding='utf-8') as f:
             f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
             
         # 일반 로거에도 기록

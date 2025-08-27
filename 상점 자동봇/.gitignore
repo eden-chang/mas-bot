@@ -33,6 +33,9 @@ logs/
 *.log
 *.log.*
 
+# 보안 파일들
+credentials/
+
 # 임시 파일들
 *.tmp
 *.temp
