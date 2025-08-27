@@ -213,7 +213,7 @@ class CustomCommandManager:
             return text
         
         # 프리미엄 기능 활성화 여부 확인
-        if not config.PREMIUM_DICE_ENABLED:
+        if not config.PREMIUM_CUSTOMC_ENABLED:
             logger.debug("프리미엄 다이스 기능이 비활성화되어 있음. 다이스 표기법을 그대로 유지합니다.")
             return text
         
@@ -259,7 +259,7 @@ class CustomCommandManager:
             return text
         
         # 프리미엄 기능 활성화 여부 확인
-        if not config.PREMIUM_DICE_ENABLED:
+        if not config.PREMIUM_CUSTOMC_ENABLED:
             logger.debug("프리미엄 기능이 비활성화되어 있음. 모든 괄호 표기법을 그대로 유지합니다.")
             return text
         
@@ -296,7 +296,7 @@ class CustomCommandManager:
             return text
         
         # 프리미엄 기능 비활성화 시 원본 그대로 반환
-        if not config.PREMIUM_DICE_ENABLED:
+        if not config.PREMIUM_CUSTOMC_ENABLED:
             logger.debug(f"프리미엄 기능 비활성화: 원본 텍스트 그대로 반환 - '{text}'")
             return text
         

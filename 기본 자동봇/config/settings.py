@@ -84,7 +84,7 @@ class Config:
     FORTUNE_CACHE_ENABLED: bool = os.getenv('FORTUNE_CACHE_ENABLED', 'True').lower() == 'true'
     
     # 프리미엄 기능 설정 (+5000원)
-    PREMIUM_DICE_ENABLED: bool = os.getenv('PREMIUM_DICE_ENABLED', 'False').lower() == 'true'
+    PREMIUM_CUSTOMC_ENABLED: bool = os.getenv('PREMIUM_CUSTOMC_ENABLED', 'False').lower() == 'true'
     
     # 개발/디버그 설정
     DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'False').lower() == 'true'

@@ -78,7 +78,7 @@ class Config:
     LOG_BACKUP_COUNT: int = int(os.getenv('LOG_BACKUP_COUNT', '5'))
     
     # 캐시 설정
-    CACHE_TTL: int = int(os.getenv('CACHE_TTL', '1'))  # 5분
+    CACHE_TTL: int = int(os.getenv('CACHE_TTL', '300'))  # 5분 (300초)
     
     # 운세 설정
     FORTUNE_CACHE_ENABLED: bool = os.getenv('FORTUNE_CACHE_ENABLED', 'True').lower() == 'true'
@@ -89,7 +89,9 @@ class Config:
     
     # 프리미엄 기능 설정
     PREMIUM_TRANSFER_ENABLED: bool = os.getenv('PREMIUM_TRANSFER_ENABLED', 'False').lower() == 'true'
-    
+    PREMIUM_CUSTOMC_ENABLED: bool = os.getenv('PREMIUM_CUSTOMC_ENABLED', 'False').lower() == 'true'
+
+
     # 워크시트 이름 상수 (환경변수에서 로드)
     WORKSHEET_NAMES = {
         'HELP': os.getenv('HELP_SHEET', '도움말'),
