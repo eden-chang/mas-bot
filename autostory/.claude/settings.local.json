@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(C:\\Users\\arinp\\Documents\\Coding\\commission\\mas-commission\\0 봇\\mas-bot\\reserved-toot/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

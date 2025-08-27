@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "created_at": "2025-08-03T08:56:34.012639+09:00",
+    "last_updated": "2025-08-15T11:49:00.153103+09:00",
+    "last_sync_time": "2025-08-15T11:48:21.244426+09:00",
+    "sync_count": 6,
+    "total_entries": 1,
+    "pending_entries": 0,
+    "posted_entries": 1,
+    "failed_entries": 0
+  },
+  "entries": {
+    "row_2_5be8ef8fb254b5f1": {
+      "row_index": 2,
+      "date_str": "08/15",
+      "time_str": "11:50",
+      "account": "STATION",
+      "content": "@NOTICE 「열차 내 안내 방송 테스트 중입니다. 하나, 둘, 셋…….」",
+      "content_hash": "5be8ef8fb254b5f1",
+      "scheduled_datetime": "2025-08-15T11:50:00+09:00",
+      "status": "posted",
+      "created_at": "2025-08-15T11:48:21.243461+09:00",
+      "updated_at": "2025-08-15T11:49:00.151842+09:00",
+      "posted_at": "2025-08-15T11:49:00.151842+09:00",
+      "error_message": null,
+      "retry_count": 0
+    }
+  }
+}
