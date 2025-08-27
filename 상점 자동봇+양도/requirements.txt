@@ -1,8 +1,0 @@
-app==0.0.1
-beautifulsoup4==4.12.3
-gspread==6.1.4
-Mastodon.py==1.8.1
-pytz==2024.2
-apscheduler==3.11.0
-beautifulsoup4>=4.9.0  # HTML 파싱용
-schedule>=1.1.0        # 스케줄링용 (선택)

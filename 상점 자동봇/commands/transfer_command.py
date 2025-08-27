@@ -42,6 +42,10 @@ class TransferCommand(BaseCommand):
     def execute(self, context: CommandContext) -> CommandResponse:
         """양도 명령어 실행"""
         try:
+            # 프리미엄 기능 확인
+            if not config.PREMIUM_TRANSFER_ENABLED:
+                return CommandResponse.create_error(config.get_error_message('PREMIUM_TRANSFER_REQUIRED'))
+            
             # 명령어 형식 검증 및 파싱
             parsed_data = self._parse_transfer_command(context.keywords)
             if not parsed_data:

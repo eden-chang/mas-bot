@@ -197,17 +197,24 @@ class CustomCommandManager:
     
     def _process_dice_in_text(self, text: str) -> str:
         """
-        텍스트에서 다이스 표기법을 실제 결과로 치환
+        텍스트에서 다이스 표기법을 실제 결과로 치환 (프리미엄 기능 +5000원)
         예: "능력치는 힘: {3d6}점, 민첩: {2d10+5}점입니다" 
         -> "능력치는 힘: 14점, 민첩: 17점입니다"
+        
+        프리미엄 기능이 비활성화된 경우 다이스 표기법을 그대로 유지합니다.
         
         Args:
             text: 처리할 텍스트
             
         Returns:
-            str: 다이스가 치환된 텍스트
+            str: 다이스가 치환된 텍스트 (프리미엄 활성화 시) 또는 원본 텍스트
         """
         if not text:
+            return text
+        
+        # 프리미엄 기능 활성화 여부 확인
+        if not config.PREMIUM_DICE_ENABLED:
+            logger.debug("프리미엄 다이스 기능이 비활성화되어 있음. 다이스 표기법을 그대로 유지합니다.")
             return text
         
         # {다이스표현식} 패턴 찾기
@@ -223,12 +230,12 @@ class CustomCommandManager:
                 rolls, final_result = self._calculate_dice_result(dice_config)
                 
                 # 로그 기록
-                logger.debug(f"다이스 치환: {dice_expr} -> {rolls} = {final_result}")
+                logger.debug(f"프리미엄 다이스 치환: {dice_expr} -> {rolls} = {final_result}")
                 
                 return str(final_result)
                 
             except Exception as e:
-                logger.warning(f"다이스 처리 실패 ({dice_expr}): {e}")
+                logger.warning(f"프리미엄 다이스 처리 실패 ({dice_expr}): {e}")
                 # 실패 시 원본 그대로 반환
                 return match.group(0)
         
@@ -237,16 +244,23 @@ class CustomCommandManager:
     
     def _process_korean_substitutions(self, text: str, user_name: str) -> str:
         """
-        한국어 치환 처리 ({시전자} 및 조사 처리)
+        한국어 치환 처리 ({시전자} 및 조사 처리) - 프리미엄 기능 (+5000원)
+        
+        프리미엄 기능이 비활성화된 경우 모든 괄호 표기법을 그대로 유지합니다.
         
         Args:
             text: 처리할 텍스트
             user_name: 사용자 이름
             
         Returns:
-            str: 한국어 치환이 완료된 텍스트
+            str: 한국어 치환이 완료된 텍스트 (프리미엄 활성화 시) 또는 원본 텍스트
         """
         if not text:
+            return text
+        
+        # 프리미엄 기능 활성화 여부 확인
+        if not config.PREMIUM_DICE_ENABLED:
+            logger.debug("프리미엄 기능이 비활성화되어 있음. 모든 괄호 표기법을 그대로 유지합니다.")
             return text
         
         # 먼저 {시전자}를 실제 사용자 이름으로 치환
@@ -257,33 +271,43 @@ class CustomCommandManager:
             # format_korean 함수를 사용하여 조사 자동 처리
             processed_text = format_korean(processed_text, 시전자=user_name)
             
-            logger.debug(f"한국어 치환: '{text}' -> '{processed_text}'")
+            logger.debug(f"프리미엄 한국어 치환: '{text}' -> '{processed_text}'")
             
         except Exception as e:
-            logger.warning(f"한국어 조사 처리 실패: {e}")
+            logger.warning(f"프리미엄 한국어 조사 처리 실패: {e}")
             # 실패 시 최소한 {시전자}만 치환된 상태로 반환
         
         return processed_text
     
     def _process_all_substitutions(self, text: str, user_name: str) -> str:
         """
-        모든 치환 처리 (다이스 + 한국어)
+        모든 치환 처리 (다이스 + 한국어) - 프리미엄 기능 (+5000원)
+        
+        프리미엄 기능이 비활성화된 경우 모든 괄호 표기법을 원본 그대로 유지합니다.
         
         Args:
             text: 처리할 텍스트
             user_name: 사용자 이름
             
         Returns:
-            str: 모든 치환이 완료된 텍스트
+            str: 모든 치환이 완료된 텍스트 (프리미엄 활성화 시) 또는 원본 텍스트
         """
         if not text:
             return text
         
+        # 프리미엄 기능 비활성화 시 원본 그대로 반환
+        if not config.PREMIUM_DICE_ENABLED:
+            logger.debug(f"프리미엄 기능 비활성화: 원본 텍스트 그대로 반환 - '{text}'")
+            return text
+        
+        # 프리미엄 기능 활성화 시 모든 치환 처리
         # 1. 한국어 치환 처리 ({시전자} 및 조사)
         processed_text = self._process_korean_substitutions(text, user_name)
         
         # 2. 다이스 치환 처리
         processed_text = self._process_dice_in_text(processed_text)
+        
+        logger.debug(f"프리미엄 모든 치환 완료: '{text}' -> '{processed_text}'")
         
         return processed_text
     

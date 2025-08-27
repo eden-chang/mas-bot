@@ -73,20 +73,22 @@ class Config:
     
     # 로그 설정
     LOG_LEVEL: str = os.getenv('LOG_LEVEL', 'INFO')
-    LOG_FILE_PATH: str = os.getenv('LOG_FILE_PATH', str(BASE_DIR / 'logs' / 'bot.log'))
+    LOG_FILE_PATH: str = os.getenv('LOG_FILE_PATH', 'logs/bot.log')
     LOG_MAX_BYTES: int = int(os.getenv('LOG_MAX_BYTES', '10485760'))  # 10MB
     LOG_BACKUP_COUNT: int = int(os.getenv('LOG_BACKUP_COUNT', '5'))
     
     # 캐시 설정
     CACHE_TTL: int = int(os.getenv('CACHE_TTL', '1'))  # 5분
-
+    
     # 운세 설정
     FORTUNE_CACHE_ENABLED: bool = os.getenv('FORTUNE_CACHE_ENABLED', 'True').lower() == 'true'
-    
     
     # 개발/디버그 설정
     DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     ENABLE_CONSOLE_LOG: bool = os.getenv('ENABLE_CONSOLE_LOG', 'True').lower() == 'true'
+    
+    # 프리미엄 기능 설정
+    PREMIUM_TRANSFER_ENABLED: bool = os.getenv('PREMIUM_TRANSFER_ENABLED', 'False').lower() == 'true'
     
     # 워크시트 이름 상수 (환경변수에서 로드)
     WORKSHEET_NAMES = {
@@ -103,6 +105,7 @@ class Config:
         '소지금', '포인트', '갈레온', '코인', '달러',
         '소지품', '인벤토리', '가방',
         '상점', '마트', '매점', '설명', '사용', '구매',
+        '양도',
         '소지금 추가', '소지금 차감', '소지금추가', '소지금차감',
         ]
     
@@ -118,6 +121,7 @@ class Config:
         'DICE_SIDES_LIMIT': f'주사위 면수는 최대 1000면까지 가능합니다.',
         'SHEET_NOT_FOUND': '필요한 시트를 찾을 수 없습니다.',
         'DATA_NOT_FOUND': '데이터를 찾을 수 없습니다.',
+        'PREMIUM_TRANSFER_REQUIRED': '양도 기능을 위해서는 추가 옵션을 구매하시기 바랍니다.',
     }
     
     # 성공 메시지 상수
