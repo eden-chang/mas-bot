@@ -114,25 +114,22 @@ class NotificationHandler:
             self.mastodon_manager = mastodon_manager
             self.story_loop_manager = story_loop_manager
             
-            # STORY 계정 클라이언트 설정
-            story_account_config = config.MASTODON_ACCOUNTS.get('STORY')
-            if not story_account_config:
-                logger.error("STORY 계정 설정을 찾을 수 없습니다")
+            # STORY 계정 정보 설정 (mastodon_manager를 통해 접근)
+            if 'STORY' not in self.mastodon_manager.clients:
+                logger.error("STORY 계정을 찾을 수 없습니다")
                 return False
             
-            self.story_client = Mastodon(
-                client_id=story_account_config['client_id'],
-                client_secret=story_account_config['client_secret'],
-                access_token=story_account_config['access_token'],
-                api_base_url=config.MASTODON_INSTANCE_URL,
-                request_timeout=30
-            )
+            self.story_client = self.mastodon_manager.clients['STORY']
             
             # 연결 테스트 및 계정 정보 저장
             try:
-                account_info = self.story_client.me()
-                self.story_account_username = account_info.get('username', '').lower()
-                logger.info(f"✅ STORY 계정 연결 성공: @{self.story_account_username}")
+                account_info = self.story_client.get_bot_info()
+                if account_info:
+                    self.story_account_username = account_info.get('username', '').lower()
+                    logger.info(f"✅ STORY 계정 연결 성공: @{self.story_account_username}")
+                else:
+                    logger.error("❌ STORY 계정 정보 조회 실패")
+                    return False
             except Exception as e:
                 logger.error(f"❌ STORY 계정 연결 실패: {e}")
                 return False
@@ -232,8 +229,8 @@ class NotificationHandler:
         try:
             self.stats['last_check_time'] = datetime.now(pytz.timezone('Asia/Seoul')).isoformat()
             
-            # 최신 알림 조회 (최대 20개)
-            notifications = self.story_client.notifications(limit=20)
+            # 최신 알림 조회 (최대 20개) - STORY 클라이언트의 raw mastodon client 사용
+            notifications = self.story_client.client.notifications(limit=20)
             
             if not notifications:
                 return
