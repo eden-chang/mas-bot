@@ -100,7 +100,7 @@ class TootData:
     툿 데이터를 나타내는 클래스
     """
     
-    def __init__(self, row_index: int, date_str: str, time_str: str, account: str, content: str):
+    def __init__(self, row_index: int, date_str: str, time_str: str, account: str, content: str, scope: str = ""):
         """
         TootData 초기화
         
@@ -110,6 +110,7 @@ class TootData:
             time_str: 시간 문자열
             account: 계정 이름
             content: 툿 내용
+            scope: 범위 ('로컬' 또는 '디엠')
         """
         self.row_index = row_index
         self.date_str = date_str.strip() if date_str else ""
@@ -122,6 +123,7 @@ class TootData:
         else:
             self.account = ""
         self.content = content.strip() if content else ""
+        self.scope = scope.strip() if scope else "로컬"  # 기본값은 로컬
         
         # 파싱된 datetime (지연 로딩)
         self._parsed_datetime = None
@@ -148,6 +150,8 @@ class TootData:
             bool(self.time_str) and
             bool(self.account) and
             bool(self.content) and
+            bool(self.scope) and
+            self.scope in ['로컬', '디엠'] and
             self.scheduled_datetime is not None and
             self.is_account_valid()
         )
@@ -170,6 +174,10 @@ class TootData:
             return f"유효하지 않은 계정: {self.account}"
         if not self.content:
             return "내용이 없습니다"
+        if not self.scope:
+            return "범위가 없습니다"
+        if self.scope not in ['로컬', '디엠']:
+            return f"유효하지 않은 범위: {self.scope} (로컬 또는 디엠만 가능)"
         if self._parse_error:
             return self._parse_error
         if self.scheduled_datetime is None:
@@ -187,6 +195,16 @@ class TootData:
         
         return self.scheduled_datetime > reference_time
     
+    def get_visibility(self) -> str:
+        """범위를 마스토돈 visibility로 변환"""
+        if self.scope == '디엠':
+            return 'direct'
+        elif self.scope == '로컬':
+            return 'unlisted'
+        else:
+            # 기본값은 로컬 (unlisted)
+            return 'unlisted'
+    
     def to_dict(self) -> Dict[str, Any]:
         """딕셔너리로 변환"""
         return {
@@ -195,6 +213,7 @@ class TootData:
             'time_str': self.time_str,
             'account': self.account,
             'content': self.content,
+            'scope': self.scope,
             'scheduled_datetime': self.scheduled_datetime.isoformat() if self.scheduled_datetime else None,
             'is_valid': self.is_valid,
             'validation_error': self.validation_error
@@ -204,9 +223,9 @@ class TootData:
         """문자열 표현"""
         if self.scheduled_datetime:
             formatted_time = format_datetime_korean(self.scheduled_datetime)
-            return f"[행{self.row_index}] {self.account}: {formatted_time}: {self.content[:50]}..."
+            return f"[행{self.row_index}] {self.account} ({self.scope}): {formatted_time}: {self.content[:50]}..."
         else:
-            return f"[행{self.row_index}] {self.account}: {self.date_str} {self.time_str}: {self.content[:50]}... (파싱 실패)"
+            return f"[행{self.row_index}] {self.account} ({self.scope}): {self.date_str} {self.time_str}: {self.content[:50]}... (파싱 실패)"
 
 
 class GoogleSheetsClient:
@@ -341,10 +360,12 @@ class GoogleSheetsClient:
                 'time_col': None,      # 시간 열 인덱스
                 'account_col': None,   # 계정 열 인덱스
                 'content_col': None,   # 내용 열 인덱스
+                'scope_col': None,     # 범위 열 인덱스
                 'date_letter': None,   # 날짜 열 문자 (A, B, C...)
                 'time_letter': None,   # 시간 열 문자
                 'account_letter': None, # 계정 열 문자
                 'content_letter': None, # 내용 열 문자
+                'scope_letter': None,  # 범위 열 문자
                 'headers': headers,    # 전체 헤더 목록
                 'errors': [],
                 'warnings': []
@@ -355,6 +376,7 @@ class GoogleSheetsClient:
             time_keywords = ['시간', 'time', '시각', '타임', 'hour']
             account_keywords = ['계정', 'account', '사용자', '아이디', 'user', 'id']
             content_keywords = ['문구', '내용', 'content', '툿', 'toot', '메시지', 'message', '텍스트', 'text']
+            scope_keywords = ['범위', 'scope', '가시성', 'visibility', '공개', 'privacy']
             
             # 각 열 검사
             for col_idx, header in enumerate(headers):
@@ -399,6 +421,15 @@ class GoogleSheetsClient:
                             header_info['content_letter'] = col_letter
                             logger.debug(f"내용 열 발견: {col_letter}열 '{header}'")
                             break
+                
+                # 범위 열 찾기
+                if header_info['scope_col'] is None:
+                    for keyword in scope_keywords:
+                        if keyword.lower() in header_lower:
+                            header_info['scope_col'] = col_idx
+                            header_info['scope_letter'] = col_letter
+                            logger.debug(f"범위 열 발견: {col_letter}열 '{header}'")
+                            break
             
             # 검증
             missing_cols = []
@@ -418,6 +449,10 @@ class GoogleSheetsClient:
                 missing_cols.append('내용')
                 header_info['errors'].append("내용 열을 찾을 수 없습니다. 가능한 키워드: " + ", ".join(content_keywords))
             
+            # 범위 열은 선택적이므로 경고로만 처리
+            if header_info['scope_col'] is None:
+                header_info['warnings'].append("범위 열을 찾을 수 없습니다. 기본값 '로컬'이 사용됩니다. 가능한 키워드: " + ", ".join(scope_keywords))
+            
             # 결과 로깅
             if not header_info['errors']:
                 logger.info(f"✅ 헤더 열 감지 완료:")
@@ -425,6 +460,8 @@ class GoogleSheetsClient:
                 logger.info(f"   - 시간: {header_info['time_letter']}열 '{headers[header_info['time_col']]}'")
                 logger.info(f"   - 계정: {header_info['account_letter']}열 '{headers[header_info['account_col']]}'")
                 logger.info(f"   - 내용: {header_info['content_letter']}열 '{headers[header_info['content_col']]}'")
+                if header_info['scope_col'] is not None:
+                    logger.info(f"   - 범위: {header_info['scope_letter']}열 '{headers[header_info['scope_col']]}'")
             else:
                 logger.error("❌ 헤더 열 감지 실패:")
                 for error in header_info['errors']:
@@ -526,8 +563,10 @@ class GoogleSheetsClient:
             # 동적 범위 계산
             end_row = start_row + max_rows - 1
             
-            # 필요한 열만 조회 (date_col, time_col, account_col, content_col)
+            # 필요한 열만 조회 (date_col, time_col, account_col, content_col, scope_col)
             cols_needed = [header_info['date_col'], header_info['time_col'], header_info['account_col'], header_info['content_col']]
+            if header_info['scope_col'] is not None:
+                cols_needed.append(header_info['scope_col'])
             start_col_letter = chr(65 + min(cols_needed))  # 가장 앞 열
             end_col_letter = chr(65 + max(cols_needed))    # 가장 뒤 열
             
@@ -563,12 +602,13 @@ class GoogleSheetsClient:
                 time_str = row[header_info['time_col'] - min(cols_needed)] if header_info['time_col'] is not None else ""
                 account = row[header_info['account_col'] - min(cols_needed)] if header_info['account_col'] is not None else ""
                 content = row[header_info['content_col'] - min(cols_needed)] if header_info['content_col'] is not None else ""
+                scope = row[header_info['scope_col'] - min(cols_needed)] if header_info['scope_col'] is not None else "로컬"
                 
                 # 빈 행 건너뛰기
                 if not any([date_str.strip(), time_str.strip(), account.strip(), content.strip()]):
                     continue
                 
-                toot_data = TootData(row_index, date_str, time_str, account, content)
+                toot_data = TootData(row_index, date_str, time_str, account, content, scope)
                 toot_data_list.append(toot_data)
             
             self.stats['total_rows_fetched'] += len(toot_data_list)
@@ -716,6 +756,7 @@ class GoogleSheetsClient:
                 'time_col': header_info.get('time_letter', 'None'),
                 'account_col': header_info.get('account_letter', 'None'),
                 'content_col': header_info.get('content_letter', 'None'),
+                'scope_col': header_info.get('scope_letter', 'None'),
                 'headers': header_info.get('headers', [])
             }
             
@@ -728,6 +769,8 @@ class GoogleSheetsClient:
             if all(col is not None for col in [header_info['date_col'], header_info['time_col'], header_info['account_col'], header_info['content_col']]):
                 # 필요한 열들의 범위 계산
                 cols_needed = [header_info['date_col'], header_info['time_col'], header_info['account_col'], header_info['content_col']]
+                if header_info['scope_col'] is not None:
+                    cols_needed.append(header_info['scope_col'])
                 start_col_letter = chr(65 + min(cols_needed))
                 end_col_letter = chr(65 + max(cols_needed))
                 
@@ -751,19 +794,21 @@ class GoogleSheetsClient:
                     time_str = row[header_info['time_col'] - min(cols_needed)] if header_info['time_col'] is not None else ""
                     account = row[header_info['account_col'] - min(cols_needed)] if header_info['account_col'] is not None else ""
                     content = row[header_info['content_col'] - min(cols_needed)] if header_info['content_col'] is not None else ""
+                    scope = row[header_info['scope_col'] - min(cols_needed)] if header_info['scope_col'] is not None else "로컬"
                     
                     row_info = {
                         'row_number': i + 2,
                         'date': date_str,
                         'time': time_str,
                         'account': account,
-                        'content': content
+                        'content': content,
+                        'scope': scope
                     }
                     result['sample_data'].append(row_info)
                     
                     # 데이터 검증
                     if any([date_str.strip(), time_str.strip(), account.strip(), content.strip()]):  # 빈 행이 아니면
-                        toot_data = TootData(i + 2, date_str, time_str, account, content)
+                        toot_data = TootData(i + 2, date_str, time_str, account, content, scope)
                         if not toot_data.is_valid:
                             result['warnings'].append(f"행 {i + 2}: {toot_data.validation_error}")
             

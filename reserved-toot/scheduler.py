@@ -477,14 +477,14 @@ class TootScheduler:
             bool: 실행 성공 여부
         """
         try:
-            logger.info(f"🚀 툿 실행: 행 {entry.row_index} | {entry.account} | {format_datetime_korean(entry.scheduled_datetime)}")
+            logger.info(f"🚀 툿 실행: 행 {entry.row_index} | {entry.account} | {entry.scope} | {format_datetime_korean(entry.scheduled_datetime)}")
             
-            # 마스토돈에 포스팅 (계정별)
+            # 마스토돈에 포스팅 (계정별, 범위에 따른 visibility 설정)
             result = self.mastodon_manager.post_scheduled_toot(
                 content=entry.content,
                 account_name=entry.account,
                 scheduled_at=entry.scheduled_datetime,
-                visibility='unlisted'
+                visibility=entry.get_visibility()
             )
             
             if result.success:

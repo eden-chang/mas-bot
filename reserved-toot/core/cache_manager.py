@@ -37,7 +37,7 @@ class CacheEntry:
     def __init__(self, row_index: int, date_str: str, time_str: str, 
                  account: str, content: str, content_hash: str, 
                  scheduled_datetime: Optional[datetime] = None,
-                 status: str = 'pending'):
+                 status: str = 'pending', scope: str = '로컬'):
         """
         CacheEntry 초기화
         
@@ -50,6 +50,7 @@ class CacheEntry:
             content_hash: 내용 해시값
             scheduled_datetime: 파싱된 예약 시간
             status: 상태 ('pending', 'posted', 'failed', 'skipped')
+            scope: 범위 ('로컬' 또는 '디엠')
         """
         self.row_index = row_index
         self.date_str = date_str
@@ -59,6 +60,7 @@ class CacheEntry:
         self.content_hash = content_hash
         self.scheduled_datetime = scheduled_datetime
         self.status = status
+        self.scope = scope
         self.created_at = datetime.now(pytz.timezone('Asia/Seoul'))
         self.updated_at = self.created_at
         self.posted_at = None
@@ -90,7 +92,8 @@ class CacheEntry:
             account=toot_data.account,
             content=toot_data.content,
             content_hash=content_hash,
-            scheduled_datetime=toot_data.scheduled_datetime
+            scheduled_datetime=toot_data.scheduled_datetime,
+            scope=toot_data.scope
         )
     
     @staticmethod
@@ -126,6 +129,16 @@ class CacheEntry:
             self.posted_at = self.updated_at
         elif status == 'failed':
             self.retry_count += 1
+    
+    def get_visibility(self) -> str:
+        """범위를 마스토돈 visibility로 변환"""
+        if self.scope == '디엠':
+            return 'direct'
+        elif self.scope == '로컬':
+            return 'unlisted'
+        else:
+            # 기본값은 로컬 (unlisted)
+            return 'unlisted'
     
     def is_expired(self, current_time: Optional[datetime] = None) -> bool:
         """
@@ -173,6 +186,7 @@ class CacheEntry:
             'content_hash': self.content_hash,
             'scheduled_datetime': self.scheduled_datetime.isoformat() if self.scheduled_datetime else None,
             'status': self.status,
+            'scope': self.scope,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
             'posted_at': self.posted_at.isoformat() if self.posted_at else None,
@@ -190,7 +204,8 @@ class CacheEntry:
             account=data.get('account', ''),  # 하위 호환성을 위해 기본값 제공
             content=data['content'],
             content_hash=data['content_hash'],
-            status=data.get('status', 'pending')
+            status=data.get('status', 'pending'),
+            scope=data.get('scope', '로컬')  # 하위 호환성을 위해 기본값 제공
         )
         
         # 시간 정보 복원
