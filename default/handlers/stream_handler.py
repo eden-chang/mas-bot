@@ -1130,7 +1130,7 @@ def validate_stream_dependencies() -> Tuple[bool, list]:
     # 환경 변수 확인 (config 모듈이 있는 경우만)
     if IMPORTS_AVAILABLE:
         try:
-            required_env = ['MASTODON_CLIENT_ID', 'MASTODON_CLIENT_SECRET', 'MASTODON_ACCESS_TOKEN']
+            required_env = ['MASTODON_ACCESS_TOKEN']
             for env_var in required_env:
                 if not hasattr(config, env_var) or not getattr(config, env_var, None):
                     errors.append(f"환경 변수 {env_var}가 설정되지 않았습니다")
