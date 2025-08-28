@@ -76,16 +76,19 @@ class ConfigValidator:
         """
         result = ValidationResult(is_valid=True, errors=[], warnings=[])
         
-        # 필수 환경 변수 검증
-        required_env_vars = [
-            ('MASTODON_CLIENT_ID', Config.MASTODON_CLIENT_ID),
-            ('MASTODON_CLIENT_SECRET', Config.MASTODON_CLIENT_SECRET),
-            ('MASTODON_ACCESS_TOKEN', Config.MASTODON_ACCESS_TOKEN),
-        ]
-        
-        for var_name, var_value in required_env_vars:
-            if not var_value or var_value.strip() == '':
-                result.add_error(f"필수 환경 변수 '{var_name}'가 설정되지 않았습니다.")
+        # 마스토돈 인증 정보 검증
+        # 액세스 토큰이 있으면 충분하고, 없으면 CLIENT_ID와 CLIENT_SECRET가 필요
+        if not Config.MASTODON_ACCESS_TOKEN or Config.MASTODON_ACCESS_TOKEN.strip() == '':
+            # 액세스 토큰이 없으면 CLIENT_ID, CLIENT_SECRET 필수
+            if not Config.MASTODON_CLIENT_ID or Config.MASTODON_CLIENT_ID.strip() == '':
+                result.add_error("MASTODON_ACCESS_TOKEN이 없으면 MASTODON_CLIENT_ID가 필수입니다.")
+            if not Config.MASTODON_CLIENT_SECRET or Config.MASTODON_CLIENT_SECRET.strip() == '':
+                result.add_error("MASTODON_ACCESS_TOKEN이 없으면 MASTODON_CLIENT_SECRET이 필수입니다.")
+        else:
+            # 액세스 토큰이 있으면 CLIENT_ID, CLIENT_SECRET는 선택사항
+            if (not Config.MASTODON_CLIENT_ID or Config.MASTODON_CLIENT_ID.strip() == '') and \
+               (not Config.MASTODON_CLIENT_SECRET or Config.MASTODON_CLIENT_SECRET.strip() == ''):
+                result.add_warning("MASTODON_ACCESS_TOKEN이 있으므로 CLIENT_ID, CLIENT_SECRET는 필수가 아닙니다.")
         
         # Mastodon API URL 검증
         if not Config.MASTODON_API_BASE_URL.startswith(('http://', 'https://')):
@@ -119,9 +122,9 @@ class ConfigValidator:
         if Config.LOG_LEVEL.upper() not in valid_log_levels:
             result.add_error(f"LOG_LEVEL은 다음 중 하나여야 합니다: {', '.join(valid_log_levels)}")
         
-        # 시트 이름 검증
-        if not Config.SHEET_NAME or Config.SHEET_NAME.strip() == '':
-            result.add_error("SHEET_NAME이 설정되지 않았습니다.")
+        # 시트 ID 검증
+        if not Config.SHEET_ID or Config.SHEET_ID.strip() == '':
+            result.add_error("SHEET_ID가 설정되지 않았습니다.")
         
         # 관리자 ID 검증
         if not Config.SYSTEM_ADMIN_ID or Config.SYSTEM_ADMIN_ID.strip() == '':

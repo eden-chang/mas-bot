@@ -77,15 +77,15 @@ def normalize_text(text: str) -> str:
 class SheetsManager:
     """Google Sheets 관리 클래스"""
     
-    def __init__(self, sheet_name: str = None, credentials_path: str = None):
+    def __init__(self, sheet_id: str = None, credentials_path: str = None):
         """
         SheetsManager 초기화
         
         Args:
-            sheet_name: 스프레드시트 이름
+            sheet_id: 스프레드시트 ID
             credentials_path: 인증 파일 경로
         """
-        self.sheet_name = sheet_name or config.SHEET_NAME
+        self.sheet_id = sheet_id or config.SHEET_ID
         self.credentials_path = credentials_path or config.get_credentials_path()
         self._spreadsheet = None
         self._worksheets_cache = {}
@@ -112,19 +112,19 @@ class SheetsManager:
                 # Google API를 사용한 인증
                 gc = gspread.service_account(filename=str(self.credentials_path))
                 
-                # 스프레드시트 열기
-                spreadsheet = gc.open(self.sheet_name)
-                logger.info(f"✅ 스프레드시트 '{self.sheet_name}' 연결 성공")
+                # 스프레드시트 열기 (ID 기반)
+                spreadsheet = gc.open_by_key(self.sheet_id)
+                logger.info(f"✅ 스프레드시트 ID '{self.sheet_id}' 연결 성공")
                 return spreadsheet
                 
             except FileNotFoundError:
                 raise SheetAccessError(f"인증 파일을 찾을 수 없습니다: {self.credentials_path}")
             except gspread.exceptions.SpreadsheetNotFound:
-                raise SheetAccessError(f"스프레드시트 '{self.sheet_name}'을 찾을 수 없습니다.")
+                raise SheetAccessError(f"스프레드시트 ID '{self.sheet_id}'를 찾을 수 없습니다.")
             except Exception as e:
                 raise SheetAccessError(f"스프레드시트 연결 실패: {str(e)}")
         
-        with ErrorContext("스프레드시트 연결", sheet_name=self.sheet_name):
+        with ErrorContext("스프레드시트 연결", sheet_id=self.sheet_id):
             result = safe_execute(
                 operation_func=connection_operation,
                 max_retries=config.MAX_RETRIES
@@ -599,9 +599,9 @@ def get_sheets_manager() -> SheetsManager:
 
 
 # 기존 코드와의 호환성을 위한 함수들
-def connect_to_sheet(sheet_name: str = None, credentials_file: str = None):
-    """기존 connect_to_sheet 함수 호환성 유지"""
-    manager = SheetsManager(sheet_name, credentials_file)
+def connect_to_sheet(sheet_id: str = None, credentials_file: str = None):
+    """기존 connect_to_sheet 함수 호환성 유지 (시트 ID 기반으로 변경)"""
+    manager = SheetsManager(sheet_id, credentials_file)
     return manager.spreadsheet
 
 

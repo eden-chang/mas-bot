@@ -153,13 +153,22 @@ class BotApplication:
         try:
             logger.info("📡 마스토돈 API 연결 중...")
             
-            self.api = mastodon.Mastodon(
-                client_id=config.MASTODON_CLIENT_ID,
-                client_secret=config.MASTODON_CLIENT_SECRET,
-                access_token=config.MASTODON_ACCESS_TOKEN,
-                api_base_url=config.MASTODON_API_BASE_URL,
-                version_check_mode='none'
-            )
+            # 액세스 토큰이 있으면 직접 사용 (CLIENT_ID, CLIENT_SECRET 불필요)
+            if config.MASTODON_ACCESS_TOKEN:
+                self.api = mastodon.Mastodon(
+                    access_token=config.MASTODON_ACCESS_TOKEN,
+                    api_base_url=config.MASTODON_API_BASE_URL,
+                    version_check_mode='none'
+                )
+            else:
+                # 액세스 토큰이 없는 경우만 CLIENT_ID, CLIENT_SECRET 사용
+                self.api = mastodon.Mastodon(
+                    client_id=config.MASTODON_CLIENT_ID,
+                    client_secret=config.MASTODON_CLIENT_SECRET,
+                    access_token=config.MASTODON_ACCESS_TOKEN,
+                    api_base_url=config.MASTODON_API_BASE_URL,
+                    version_check_mode='none'
+                )
             
             # 연결 테스트
             account_info = self.api.me()
@@ -178,7 +187,7 @@ class BotApplication:
             logger.info("📊 Google Sheets 연결 중...")
             
             self.sheets_manager = SheetsManager(
-                sheet_name=config.SHEET_NAME,
+                sheet_id=config.SHEET_ID,
                 credentials_path=config.get_credentials_path()
             )
             
@@ -415,7 +424,7 @@ def show_help():
     print("  MASTODON_API_BASE_URL    # 마스토돈 인스턴스 URL")
     print("")
     print("선택 환경 변수:")
-    print("  SHEET_NAME              # Google Sheets 이름")
+    print("  SHEET_ID                # Google Sheets ID")
     print("  GOOGLE_CREDENTIALS_PATH # Google 인증 파일 경로")
     print("  LOG_LEVEL               # 로그 레벨 (DEBUG/INFO/WARNING/ERROR)")
     print("")

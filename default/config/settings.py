@@ -59,7 +59,7 @@ class Config:
         'GOOGLE_CREDENTIALS_PATH', 
         str(BASE_DIR / 'credentials' / 'credentials.json')
     )
-    SHEET_NAME: str = os.getenv('SHEET_NAME', '메인 시트')
+    SHEET_ID: str = os.getenv('SHEET_ID', '')
     
     # 봇 동작 설정
     MAX_RETRIES: int = int(os.getenv('BOT_MAX_RETRIES', '5'))
