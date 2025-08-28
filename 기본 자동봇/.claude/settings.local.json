@@ -6,7 +6,10 @@
       "Bash(rg:*)",
       "Bash(findstr:*)",
       "WebFetch(domain:koltsevaya.xyz)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(py:*)",
+      "Bash(where python)",
+      "Bash(.venv/Scripts/python.exe:*)"
     ],
     "deny": []
   }

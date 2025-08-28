@@ -71,6 +71,8 @@ class CustomCommandManager:
         # 대소문자를 소문자로 통일하고 띄어쓰기 제거
         normalized = re.sub(r'\s+', '', command.lower().strip())
         
+        logger.debug(f"명령어 정규화: '{command}' -> '{normalized}'")
+        
         return normalized
     
     def _parse_dice_expression(self, dice_expression: str) -> Dict[str, Any]:
@@ -349,14 +351,20 @@ class CustomCommandManager:
                 return commands
             
             # 데이터 처리
-            for row in custom_data:
+            logger.debug(f"커스텀 시트 데이터 처리 시작: {len(custom_data)}개 행")
+            
+            for i, row in enumerate(custom_data):
                 if not isinstance(row, dict):
+                    logger.debug(f"행 {i}: dict가 아닌 타입 스킵 - {type(row)}")
                     continue
                 
                 command = str(row.get('명령어', '')).strip()
                 phrase = str(row.get('문구', '')).strip()
                 
+                logger.debug(f"행 {i}: 원본 데이터 - 명령어='{command}', 문구='{phrase[:50]}...'")
+                
                 if not command or not phrase:
+                    logger.debug(f"행 {i}: 빈 데이터로 인한 스킵 - 명령어='{command}', 문구='{phrase}'")
                     continue
                 
                 # 명령어 정규화
@@ -366,6 +374,9 @@ class CustomCommandManager:
                     if normalized_command not in commands:
                         commands[normalized_command] = []
                     commands[normalized_command].append(phrase)
+                    logger.debug(f"커스텀 명령어 추가: 원본='{command}', 정규화='{normalized_command}', 문구='{phrase[:50]}...'")
+                else:
+                    logger.warning(f"빈 정규화 결과로 인한 명령어 스킵: '{command}'")
             
             logger.info(f"커스텀 명령어 로드 완료: {len(commands)}개 명령어, "
                        f"{sum(len(phrases) for phrases in commands.values())}개 문구")
@@ -425,10 +436,15 @@ class CustomCommandManager:
         # 커스텀 명령어 목록 가져오기
         commands = self._get_custom_commands()
         
+        logger.debug(f"명령어 매칭 시도: 입력='{input_command}', 정규화='{normalized_input}'")
+        logger.debug(f"사용 가능한 명령어 목록: {list(commands.keys())}")
+        
         # 정확히 일치하는 명령어 찾기
         if normalized_input in commands:
+            logger.debug(f"명령어 매칭 성공: '{normalized_input}'")
             return normalized_input
         
+        logger.debug(f"명령어 매칭 실패: '{normalized_input}' not found in {list(commands.keys())}")
         return None
     
     def get_random_phrase(self, command: str, user_name: str = "") -> Optional[str]:
@@ -472,14 +488,19 @@ class CustomCommandManager:
         Returns:
             Optional[str]: 실행 결과 문구 또는 None (일치하는 명령어가 없는 경우)
         """
+        logger.debug(f"커스텀 명령어 실행 요청: '{input_command}' (사용자: {user_name})")
+        
         # 매칭되는 명령어 찾기
         matching_command = self.find_matching_command(input_command)
         
         if not matching_command:
+            logger.debug(f"커스텀 명령어 실행 실패: '{input_command}' - 매칭되는 명령어 없음")
             return None
         
         # 랜덤 문구 반환 (사용자 이름 포함)
-        return self.get_random_phrase(matching_command, user_name)
+        result = self.get_random_phrase(matching_command, user_name)
+        logger.debug(f"커스텀 명령어 실행 완료: '{input_command}' -> '{result[:100] if result else None}...'")
+        return result
     
     def get_available_commands(self) -> List[str]:
         """
