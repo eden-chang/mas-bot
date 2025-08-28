@@ -59,9 +59,9 @@ class ItemPurchaseCommand(BaseCommand):
             if not store_item:
                 # '구매 불가' 아이템인지 확인
                 if self._is_non_purchasable_item(item_name):
-                    return CommandResponse.create_error(f"'{item_name}'{add_eun_neun(item_name)[len(item_name):]} 상점에서 구매할 수 없습니다")
+                    return CommandResponse.create_error(f"'{item_name}'{add_eun_neun(item_name)[len(item_name):]} 상점에서 구매할 수 없습니다.")
                 else:
-                    return CommandResponse.create_error(f"'{item_name}'{add_eun_neun(item_name)[len(item_name):]} 존재하지 않는 아이템입니다")
+                    return CommandResponse.create_error(f"'{item_name}'{add_eun_neun(item_name)[len(item_name):]} 존재하지 않는 아이템입니다.")
             
             actual_item_name, item_price = store_item
             total_cost = item_price * quantity
