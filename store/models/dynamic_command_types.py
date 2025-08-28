@@ -400,7 +400,7 @@ class CommandTypeManager:
                 if not self._reverse_mapping[command_type]:
                     del self._reverse_mapping[command_type]
                     # 동적 타입이면 제거
-                    if command_type.value in DynamicCommandType._dynamic_members:
+                    if command_type.value in DynamicCommandType._dynamic_members.keys():
                         DynamicCommandType.remove_dynamic_type(command_name)
             
             logger.debug(f"CommandType 등록 해제: {command_name}")
@@ -494,12 +494,12 @@ class CommandTypeManager:
         """통계 정보 반환 (개선됨)"""
         dynamic_types = [
             cmd_type for cmd_type in self._reverse_mapping.keys()
-            if cmd_type.value in DynamicCommandType._dynamic_members
+            if cmd_type.value in DynamicCommandType._dynamic_members.keys()
         ]
         
         static_types = [
             cmd_type for cmd_type in self._reverse_mapping.keys()
-            if cmd_type.value not in DynamicCommandType._dynamic_members
+            if cmd_type.value not in DynamicCommandType._dynamic_members.keys()
         ]
         
         # DynamicCommandType 생성 통계 추가
@@ -533,7 +533,7 @@ class CommandTypeManager:
         # 동적 타입들만 찾아서 제거
         dynamic_commands = []
         for command_name, command_type in self._command_type_mapping.items():
-            if command_type.value in DynamicCommandType._dynamic_members:
+            if command_type.value in DynamicCommandType._dynamic_members.keys():
                 dynamic_commands.append(command_name)
         
         removed_count = 0
@@ -695,7 +695,7 @@ class CommandTypeInfo:
     def from_command_type(cls, cmd_type: DynamicCommandType, manager: CommandTypeManager) -> 'CommandTypeInfo':
         """CommandType에서 정보 생성"""
         command_names = manager.get_command_names(cmd_type)
-        is_dynamic = cmd_type.value in DynamicCommandType._dynamic_members
+        is_dynamic = cmd_type.value in DynamicCommandType._dynamic_members.keys()
         
         return cls(
             name=cmd_type.name,

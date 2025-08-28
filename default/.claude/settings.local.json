@@ -9,7 +9,8 @@
       "Bash(rm:*)",
       "Bash(py:*)",
       "Bash(where python)",
-      "Bash(.venv/Scripts/python.exe:*)"
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

@@ -54,6 +54,54 @@ class MoneyAdminCommand(BaseCommand):
     5. 결과 메시지 생성
     """
     
+    def execute(self, context) -> Any:
+        """
+        새로운 BaseCommand 인터페이스에 맞춘 execute 메서드 구현
+        
+        Args:
+            context: CommandContext 또는 호환 가능한 객체
+            
+        Returns:
+            CommandResponse: 실행 결과
+        """
+        try:
+            # CommandContext에서 정보 추출
+            if hasattr(context, 'keywords'):
+                keywords = context.keywords
+                user_id = getattr(context, 'user_id', 'unknown')
+            else:
+                # 기존 호환성을 위한 fallback (User 객체인 경우)
+                keywords = getattr(context, 'keywords', [])
+                user_id = getattr(context, 'user_id', getattr(context, 'id', 'unknown'))
+            
+            # 기존 _execute_command 메서드 활용
+            from models.user import User
+            user = User(user_id=user_id)  # 임시 User 객체 생성
+            
+            message, data = self._execute_command(user, keywords)
+            
+            # CommandResponse 형태로 반환
+            if hasattr(context, '__class__'):
+                # CommandResponse 클래스가 있으면 사용
+                try:
+                    from commands.base_command import CommandResponse
+                    return CommandResponse(success=True, message=message, data=data)
+                except ImportError:
+                    # CommandResponse가 없으면 튜플 반환
+                    return True, message, data
+            
+            return True, message, data
+            
+        except Exception as e:
+            logger.error(f"MoneyAdminCommand 실행 오류: {e}")
+            error_msg = f"소지금 관리 명령어 실행 중 오류가 발생했습니다: {e}"
+            
+            try:
+                from commands.base_command import CommandResponse
+                return CommandResponse(success=False, message=error_msg, data=None)
+            except ImportError:
+                return False, error_msg, None
+    
     def _get_command_type(self) -> CommandType:
         """명령어 타입 반환"""
         return CommandType.MONEY_TRANSFER  # 기존 타입 재사용
