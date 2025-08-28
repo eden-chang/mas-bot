@@ -57,8 +57,6 @@ class DynamicCommandType(Enum, metaclass=DynamicEnumMeta):
     UNKNOWN = "unknown"
     
     # 동적 멤버 관리를 위한 클래스 변수 (개선됨)
-    _dynamic_members: Dict[str, 'DynamicCommandType'] = {}
-    _creation_count = 0  # 생성된 동적 멤버 수 추적
     
     def __new__(cls, value):
         """새 인스턴스 생성"""
@@ -235,6 +233,12 @@ class DynamicCommandType(Enum, metaclass=DynamicEnumMeta):
             'total_created': cls._creation_count,
             'total_available': len(list(cls)) + len(cls._dynamic_members)
         }
+
+
+# DynamicCommandType 클래스 정의 후 클래스 변수 초기화
+# Enum 메타클래스가 이것을 멤버로 인식하지 않도록 클래스 외부에서 추가
+DynamicCommandType._dynamic_members = {}
+DynamicCommandType._creation_count = 0
 
 
 class CommandTypeManager:
