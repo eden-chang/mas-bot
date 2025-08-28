@@ -185,7 +185,7 @@ class StoreCommand(BaseCommand):
     
     def _get_currency_unit(self) -> str:
         """
-        화폐 단위 조회 (헤더에서 추출) - 캐시 지원
+        화폐 단위 조회 (.env 우선, 헤더에서 추출 후순위) - 캐시 지원
         
         Returns:
             str: 화폐 단위
@@ -197,20 +197,28 @@ class StoreCommand(BaseCommand):
         
         currency = None
         import re
+        import os
         
         try:
+            # 0순위: .env에서 화폐 단위 조회
+            env_currency = os.getenv('CURRENCY')
+            if env_currency:
+                currency = env_currency.strip()
+                logger.debug(f".env에서 화폐 단위 추출: {currency}")
+            
             # 1순위: 아이템 데이터의 가격 헤더에서 추출
-            item_data_list = self._load_item_data()
-            if item_data_list:
-                sample_item = item_data_list[0]
-                for key in sample_item.keys():
-                    if '가격' in key and '(' in key and ')' in key:
-                        # '가격(갈레온)' -> '갈레온' 추출
-                        match = re.search(r'가격\s*\(([^)]+)\)', key)
-                        if match:
-                            currency = match.group(1).strip()
-                            logger.debug(f"아이템 가격 헤더에서 화폐 단위 추출: {key} -> {currency}")
-                            break
+            if not currency:
+                item_data_list = self._load_item_data()
+                if item_data_list:
+                    sample_item = item_data_list[0]
+                    for key in sample_item.keys():
+                        if '가격' in key and '(' in key and ')' in key:
+                            # '가격(갈레온)' -> '갈레온' 추출
+                            match = re.search(r'가격\s*\(([^)]+)\)', key)
+                            if match:
+                                currency = match.group(1).strip()
+                                logger.debug(f"아이템 가격 헤더에서 화폐 단위 추출: {key} -> {currency}")
+                                break
             
             # 2순위: 사용자 데이터의 소지금 헤더에서 추출
             if not currency:
@@ -284,7 +292,7 @@ class StoreCommand(BaseCommand):
         if not shop_items:
             return "현재 상점에 판매중인 아이템이 없습니다."
         
-        lines = ["📋 **상점 아이템 목록**\n"]
+        lines = ["구매할 수 있는 아이템\n"]
         
         for item in shop_items:
             name = item.get('name', '알 수 없는 아이템')
@@ -292,7 +300,7 @@ class StoreCommand(BaseCommand):
             description = item.get('description', '설명이 없습니다')
             item_currency = item.get('currency_unit') or currency_unit
             
-            lines.append(f"• **{name}** ({price:,}{item_currency})")
+            lines.append(f"• {name} ({price:,}{item_currency})")
             lines.append(f"  {description}")
             lines.append("")
         

@@ -18,6 +18,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from commands.base_command import BaseCommand, CommandContext, CommandResponse
 from config.settings import config
 from utils.sheets_operations import SheetsManager
+from utils.korean_utils import add_eun_neun
 
 
 class ItemPurchaseCommand(BaseCommand):
@@ -56,7 +57,11 @@ class ItemPurchaseCommand(BaseCommand):
             # 상점에서 아이템 찾기
             store_item = self._find_store_item(item_name)
             if not store_item:
-                return CommandResponse.create_error(f"'{item_name}' 아이템을 상점에서 찾을 수 없습니다")
+                # '구매 불가' 아이템인지 확인
+                if self._is_non_purchasable_item(item_name):
+                    return CommandResponse.create_error(f"'{item_name}'{add_eun_neun(item_name)[len(item_name):]} 상점에서 구매할 수 없습니다")
+                else:
+                    return CommandResponse.create_error(f"'{item_name}'{add_eun_neun(item_name)[len(item_name):]} 존재하지 않는 아이템입니다")
             
             actual_item_name, item_price = store_item
             total_cost = item_price * quantity
@@ -203,9 +208,44 @@ class ItemPurchaseCommand(BaseCommand):
         except Exception:
             return None
     
+    def _is_non_purchasable_item(self, item_name: str) -> bool:
+        """아이템이 '구매 불가' 아이템인지 확인"""
+        try:
+            store_data = self.sheets_manager.get_worksheet_data('상점', use_cache=True)
+            if not store_data:
+                return False
+            
+            # 띄어쓰기, 대소문자 무시하고 비교
+            normalized_search = re.sub(r'\s+', '', item_name.lower())
+            
+            for row in store_data:
+                row_item_name = str(row.get('아이템명', '')).strip()
+                price_str = str(row.get('가격', '')).strip()
+                
+                if not row_item_name:
+                    continue
+                
+                normalized_row = re.sub(r'\s+', '', row_item_name.lower())
+                
+                # 아이템명이 일치하는지 확인
+                if (normalized_row == normalized_search or 
+                    normalized_search in normalized_row):
+                    # 가격이 '구매 불가'인지 확인
+                    if price_str.lower().strip() in ['구매 불가', '구매불가', '불가']:
+                        return True
+            
+            return False
+            
+        except Exception:
+            return False
+    
     def _parse_price(self, price_str: str) -> int:
-        """가격 문자열 파싱"""
+        """가격 문자열 파싱 (구매 불가 아이템 제외)"""
         if not price_str:
+            return 0
+        
+        # '구매 불가' 아이템은 가격 0 반환 (구매 불가능)
+        if price_str.lower().strip() in ['구매 불가', '구매불가', '불가']:
             return 0
         
         numeric_str = re.sub(r'[^\d]', '', price_str)
