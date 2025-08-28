@@ -59,7 +59,7 @@ class StoreCommand(BaseCommand):
             shop_items = self._get_shop_items()
             
             if not shop_items:
-                return CommandResponse.create_error("현재 상점에 판매중인 아이템이 없습니다")
+                return CommandResponse.create_error("현재 상점에 판매중인 아이템이 없습니다.")
             
             # 화폐 단위 조회
             currency_unit = self._get_currency_unit()
@@ -167,12 +167,15 @@ class StoreCommand(BaseCommand):
         # 시트에서 로드
         try:
             if self.sheets_manager:
-                item_data = self.sheets_manager.get_item_data()
+                # 직접 '상점' 워크시트에서 데이터 가져오기
+                item_data = self.sheets_manager.get_worksheet_data('상점', use_cache=False)
                 if item_data:
-                    # 캐시에 저장 (15분)
+                    # 캐시에 저장 (5분)
                     bot_cache.cache_item_data(item_data, ttl=300)
-                    logger.debug(f"시트에서 아이템 데이터 로드: {len(item_data)}개")
+                    logger.debug(f"'상점' 시트에서 아이템 데이터 로드: {len(item_data)}개")
                     return item_data
+                else:
+                    logger.warning("'상점' 시트에서 데이터를 가져올 수 없습니다")
         except Exception as e:
             logger.warning(f"시트에서 아이템 데이터 로드 실패: {e}")
         
