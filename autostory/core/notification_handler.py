@@ -229,8 +229,8 @@ class NotificationHandler:
         try:
             self.stats['last_check_time'] = datetime.now(pytz.timezone('Asia/Seoul')).isoformat()
             
-            # 최신 알림 조회 (최대 20개) - STORY 클라이언트의 raw mastodon client 사용
-            notifications = self.story_client.client.notifications(limit=20)
+            # 최신 알림 조회 (최대 20개) - STORY 클라이언트의 mastodon 인스턴스 사용
+            notifications = self.story_client.mastodon.notifications(limit=20)
             
             if not notifications:
                 return
