@@ -69,6 +69,7 @@ class NotificationHandler:
         
         # STORY 계정의 마스토돈 클라이언트
         self.story_client: Optional[Mastodon] = None
+        self.story_account_username: Optional[str] = None
         
         # 알림 처리 상태
         self.is_monitoring = False
@@ -127,10 +128,11 @@ class NotificationHandler:
                 request_timeout=30
             )
             
-            # 연결 테스트
+            # 연결 테스트 및 계정 정보 저장
             try:
                 account_info = self.story_client.me()
-                logger.info(f"✅ STORY 계정 연결 성공: @{account_info.get('username', 'unknown')}")
+                self.story_account_username = account_info.get('username', '').lower()
+                logger.info(f"✅ STORY 계정 연결 성공: @{self.story_account_username}")
             except Exception as e:
                 logger.error(f"❌ STORY 계정 연결 실패: {e}")
                 return False
@@ -296,19 +298,27 @@ class NotificationHandler:
             visibility = status.get('visibility', '')
             created_at = status.get('created_at', '')
             
-            # NOTICE 계정에서 온 메시지만 처리
-            if sender_username.upper() != 'NOTICE':
-                logger.debug(f"알림 {notif_id}: NOTICE 계정이 아님 (@{sender_username})")
-                return
+            # HTML 태그 제거
+            import html
+            clean_content = html.unescape(re.sub(r'<[^>]+>', '', content)).strip()
             
             # Direct 메시지만 처리
             if visibility != 'direct':
                 logger.debug(f"알림 {notif_id}: Direct 메시지가 아님 ({visibility})")
                 return
             
-            # HTML 태그 제거
-            import html
-            clean_content = html.unescape(re.sub(r'<[^>]+>', '', content)).strip()
+            # STORY 계정에게 온 메시지인지 확인 (멘션을 통해)
+            if not self.story_account_username:
+                logger.error(f"알림 {notif_id}: STORY 계정 사용자명이 설정되지 않았습니다")
+                return
+                
+            # 메시지 내용에서 STORY 계정이 멘션되었는지 확인
+            story_mention = f"@{self.story_account_username}"
+            if story_mention.lower() not in clean_content.lower():
+                logger.debug(f"알림 {notif_id}: STORY 계정({story_mention})이 멘션되지 않음")
+                return
+            
+            logger.debug(f"알림 {notif_id}: @{sender_username}에서 {story_mention}에게 메시지 수신")
             
             logger.info(f"알림 처리: @{sender_username} -> '{clean_content}'")
             
