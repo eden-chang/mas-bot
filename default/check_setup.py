@@ -395,7 +395,7 @@ MASTODON_ACCESS_TOKEN=your_access_token_here
 MASTODON_API_BASE_URL=https://your.mastodon.instance
 
 # Google Sheets 설정
-GOOGLE_CREDENTIALS_PATH=credentials/credentials.json
+GOOGLE_CREDENTIALS_PATH=credentials.json
 SHEET_NAME=기본 자동봇 시트
 
 # 봇 설정 (선택사항)
