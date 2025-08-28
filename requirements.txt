@@ -1,0 +1,41 @@
+# 마스토돈 봇 프로젝트 전체 의존성
+# Python 3.8+ 필요
+
+# 코어 애플리케이션
+app==0.0.1
+
+# 마스토돈 API
+Mastodon.py==1.8.1
+
+# Google Sheets API
+gspread==6.1.4
+google-auth==2.23.4
+google-auth-oauthlib==1.1.0
+google-auth-httplib2==0.1.1
+google-api-python-client==2.108.0
+oauth2client>=4.1.3
+
+# 환경 변수 관리
+python-dotenv==1.0.0
+
+# 날짜/시간 처리
+python-dateutil==2.8.2
+pytz==2024.2
+
+# 스케줄링
+APScheduler==3.11.0
+schedule==1.2.0
+
+# HTML 파싱
+beautifulsoup4==4.12.3
+
+# HTTP 요청 및 유틸리티
+requests==2.31.0
+
+# 로깅
+coloredlogs==15.0.1
+
+# 개발/테스트 도구 (선택사항)
+# pytest==7.4.3
+# black==23.11.0
+# flake8==6.1.0
