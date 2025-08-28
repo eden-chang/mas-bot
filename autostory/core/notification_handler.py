@@ -387,22 +387,20 @@ class NotificationHandler:
             
             # 명령어 타입별 처리
             if command.command_type in ['story', 'script', 'story_progress']:
-                # 스토리 세션 시작
-                success = self.story_loop_manager.start_story_session(command.worksheet_name)
+                # 워크시트 검증 및 스토리 세션 시작
+                success, error_message = self._start_story_session_with_validation(command.worksheet_name)
                 
                 if success:
                     self.stats['successful_commands'] += 1
                     logger.info(f"✅ 스토리 세션 시작 성공: {command.worksheet_name}")
                     
-                    # 성공 알림 전송 (선택사항)
-                    # self._send_command_response(command, f"✅ 워크시트 '{command.worksheet_name}' 스토리 시작됨")
-                    
                 else:
                     self.stats['failed_commands'] += 1
                     logger.error(f"❌ 스토리 세션 시작 실패: {command.worksheet_name}")
                     
-                    # 실패 알림 전송 (선택사항)
-                    # self._send_command_response(command, f"❌ 워크시트 '{command.worksheet_name}' 스토리 시작 실패")
+                    # 실패 알림 전송 (멘션 포함)
+                    if error_message:
+                        self._send_command_response(command, error_message)
             
             else:
                 logger.warning(f"알 수 없는 명령어 타입: {command.command_type}")
@@ -412,6 +410,60 @@ class NotificationHandler:
             logger.error(f"명령어 실행 중 오류: {e}")
             self.stats['failed_commands'] += 1
     
+    def _start_story_session_with_validation(self, worksheet_name: str) -> tuple[bool, Optional[str]]:
+        """
+        워크시트 검증을 포함한 스토리 세션 시작
+        
+        Args:
+            worksheet_name: 워크시트 이름
+        
+        Returns:
+            tuple[bool, Optional[str]]: (성공 여부, 에러 메시지)
+        """
+        try:
+            # sheets_client는 별도로 접근해야 함
+            from core.sheets_client import get_sheets_manager
+            sheets_client = get_sheets_manager()
+            
+            # 워크시트에서 스크립트 데이터 조회
+            scripts = sheets_client.fetch_story_scripts_from_worksheet(worksheet_name)
+            
+            if not scripts:
+                error_msg = f"❌ 워크시트 '{worksheet_name}'에서 스크립트를 찾을 수 없습니다. 워크시트 이름을 확인해주세요."
+                return False, error_msg
+            
+            # 유효한 스크립트 확인
+            valid_scripts = [script for script in scripts if script.is_valid]
+            invalid_scripts = [script for script in scripts if not script.is_valid]
+            
+            if not valid_scripts:
+                # 무효한 스크립트들의 문제점 요약
+                error_details = []
+                for script in invalid_scripts[:3]:  # 처음 3개만 표시
+                    error_details.append(f"행 {script.row_index}: {script.validation_error}")
+                
+                error_msg = (f"❌ 워크시트 '{worksheet_name}'에 유효한 스크립트가 없습니다.\n"
+                           f"문제점:\n" + "\n".join(f"  - {detail}" for detail in error_details))
+                
+                if len(invalid_scripts) > 3:
+                    error_msg += f"\n  - ... 및 {len(invalid_scripts) - 3}개 추가 오류"
+                
+                return False, error_msg
+            
+            # 스토리 세션 시작
+            success = self.story_loop_manager.start_story_session(worksheet_name)
+            
+            if success:
+                return True, None
+            else:
+                error_msg = f"❌ 워크시트 '{worksheet_name}' 스토리 세션 시작에 실패했습니다."
+                return False, error_msg
+                
+        except Exception as e:
+            error_msg = f"❌ 워크시트 '{worksheet_name}' 처리 중 오류가 발생했습니다: {str(e)}"
+            logger.error(f"워크시트 검증 중 오류: {e}")
+            return False, error_msg
+
     def _send_command_response(self, command: StoryCommand, message: str) -> None:
         """
         명령어 실행 결과를 발신자에게 알림 (선택사항)

@@ -188,22 +188,12 @@ class MastodonStoryBot:
             
             self.sheets_manager = get_sheets_manager()
             
-            # 시트 구조 검증 (스토리 봇용)
-            validation_result = self.sheets_manager.validate_sheet_structure()
-            
-            if not validation_result['valid']:
-                logger.error("❌ 시트 구조 검증 실패:")
-                for error in validation_result['errors']:
-                    logger.error(f"  - {error}")
-                return False
-            
-            if validation_result['warnings']:
-                logger.warning("⚠️ 시트 구조 경고:")
-                for warning in validation_result['warnings']:
-                    logger.warning(f"  - {warning}")
-            
-            # 워크시트 목록 확인
+            # 워크시트 목록 확인으로 기본 연결만 테스트
             worksheets = self.sheets_manager.get_worksheet_names()
+            
+            if not worksheets:
+                logger.error("❌ Google Sheets 연결 실패: 워크시트를 찾을 수 없습니다")
+                return False
             
             logger.info(f"✅ Google Sheets 연결 성공")
             logger.info(f"   - 시트 ID: {config.GOOGLE_SHEETS_ID[:20]}...")
