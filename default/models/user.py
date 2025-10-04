@@ -5,6 +5,7 @@
 
 import os
 import sys
+import time
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -13,6 +14,12 @@ import pytz
 # 경로 설정 (VM 환경 대응)
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
+try:
+    from utils.logging_config import logger
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 try:
     from config.settings import config
@@ -407,7 +414,8 @@ class UserManager:
         """UserManager 초기화"""
         self._users_cache: Dict[str, User] = {}
         self._cache_timestamp = None
-        self._cache_ttl = 300  # 5분
+        self._cache_ttl = 3600  # 1시간
+        self._sheets_manager = None
     
     def create_user_from_sheet_data(self, data: Dict[str, Any]) -> User:
         """
@@ -439,6 +447,72 @@ class UserManager:
             user = User.from_sheet_data(user_data)
             return user.is_valid() and user.id == user_id
         except (UserValidationError, Exception):
+            return False
+
+    def set_sheets_manager(self, sheets_manager):
+        """
+        SheetsManager 설정
+
+        Args:
+            sheets_manager: SheetsManager 인스턴스
+        """
+        self._sheets_manager = sheets_manager
+
+    def preload_user_data(self) -> bool:
+        """
+        봇 시작 시 사용자 데이터를 미리 로드하여 캐싱
+
+        Returns:
+            bool: 로드 성공 여부
+        """
+        try:
+            if not self._sheets_manager:
+                logger.warning("SheetsManager가 설정되지 않아 사용자 데이터 사전 로드를 건너뜁니다.")
+                return False
+
+            logger.info("🔄 사용자 명단 데이터 사전 로드 시작...")
+
+            # config 임포트를 지연시켜 순환 임포트 방지
+            try:
+                from config.settings import config
+                roster_sheet_name = config.get_worksheet_name('ROSTER') if hasattr(config, 'get_worksheet_name') else '명단'
+            except ImportError:
+                roster_sheet_name = '명단'  # 기본값
+
+            # 시트에서 사용자 데이터 가져오기
+            user_data = self._sheets_manager.get_worksheet_data(roster_sheet_name)
+
+            if not user_data:
+                logger.warning("명단 시트에 데이터가 없습니다.")
+                return False
+
+            # 사용자 데이터 파싱 및 캐싱
+            loaded_count = 0
+            error_count = 0
+
+            for row_data in user_data:
+                try:
+                    if not isinstance(row_data, dict):
+                        continue
+
+                    user = self.create_user_from_sheet_data(row_data)
+                    if user and user.is_valid():
+                        self._users_cache[user.id] = user
+                        loaded_count += 1
+
+                except Exception as e:
+                    error_count += 1
+                    logger.debug(f"사용자 데이터 파싱 실패: {e}")
+                    continue
+
+            # 캐시 타임스탬프 갱신
+            self._cache_timestamp = time.time()
+
+            logger.info(f"✅ 사용자 데이터 사전 로드 완료: {loaded_count}명 로드, {error_count}개 오류")
+            return True
+
+        except Exception as e:
+            logger.error(f"❌ 사용자 데이터 사전 로드 실패: {e}")
             return False
     
     def get_user_display_info(self, user: User) -> Dict[str, str]:

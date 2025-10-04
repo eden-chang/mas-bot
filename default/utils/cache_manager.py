@@ -508,7 +508,7 @@ class BotCacheManager:
     
     def cache_roster_data(self, roster_data: List[Dict[str, Any]]) -> bool:
         """
-        명단 데이터 캐싱 (2시간 TTL)
+        명단 데이터 캐싱 (1시간 TTL)
         
         Args:
             roster_data: 명단 데이터 리스트
@@ -517,7 +517,7 @@ class BotCacheManager:
             bool: 캐싱 성공 여부
         """
         current_time = time.time()
-        expire_time = current_time + (2 * 60 * 60)  # 2시간
+        expire_time = current_time + (1 * 60 * 60)  # 1시간
         
         # 데이터와 만료 시간을 함께 저장
         cache_data = {
@@ -530,7 +530,7 @@ class BotCacheManager:
     
     def get_roster_data(self) -> Optional[List[Dict[str, Any]]]:
         """
-        캐시된 명단 데이터 조회 (2시간 TTL 확인)
+        캐시된 명단 데이터 조회 (1시간 TTL 확인)
         
         Returns:
             Optional[List]: 명단 데이터 또는 None (만료된 경우)
@@ -840,12 +840,12 @@ def invalidate_shop_items() -> bool:
 
 
 def cache_roster_data(roster_data: List[Dict[str, Any]]) -> bool:
-    """명단 데이터 캐싱 (2시간 TTL)"""
+    """명단 데이터 캐싱 (1시간 TTL)"""
     return bot_cache.cache_roster_data(roster_data)
 
 
 def get_roster_data() -> Optional[List[Dict[str, Any]]]:
-    """캐시된 명단 데이터 조회 (2시간 TTL)"""
+    """캐시된 명단 데이터 조회 (1시간 TTL)"""
     return bot_cache.get_roster_data()
 
 

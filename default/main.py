@@ -227,6 +227,18 @@ class BotApplication:
                 logger.info("✅ 캐시 워밍업 완료")
             except Exception as e:
                 logger.warning(f"⚠️ 캐시 워밍업 실패 (계속 진행): {e}")
+
+            # 사용자 명단 데이터 사전 로드
+            try:
+                from models.user import user_manager
+                user_manager.set_sheets_manager(self.sheets_manager)
+                preload_success = user_manager.preload_user_data()
+                if preload_success:
+                    logger.info("✅ 사용자 명단 사전 로드 완료")
+                else:
+                    logger.warning("⚠️ 사용자 명단 사전 로드 실패 (계속 진행)")
+            except Exception as e:
+                logger.warning(f"⚠️ 사용자 명단 사전 로드 오류 (계속 진행): {e}")
             
             # DM 지원 스트림 매니저 생성
             try:
@@ -316,7 +328,9 @@ class BotApplication:
             
             # 관리자 알림
             if config.SYSTEM_ADMIN_ID:
-                admin_message = f"@{config.SYSTEM_ADMIN_ID} 🚨 봇 시스템 오류\n{error_message[:400]}"
+                # 설정된 글자수 제한에서 여유분을 두고 오류 메시지 자르기
+                max_error_length = (config.MAX_MESSAGE_LENGTH if config else 500) - 50  # 50자 여유분
+                admin_message = f"@{config.SYSTEM_ADMIN_ID} 🚨 봇 시스템 오류\n{error_message[:max_error_length]}"
                 _send_status(
                     admin_message,
                     'direct'

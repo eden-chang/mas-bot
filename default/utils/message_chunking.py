@@ -22,6 +22,13 @@ except ImportError:
     import logging
     logger = logging.getLogger('message_chunking')
 
+try:
+    from config.settings import config
+except ImportError:
+    import logging
+    logging.warning("설정 파일을 불러올 수 없습니다. 기본값을 사용합니다.")
+    config = None
+
 # Runtime imports to avoid circular import
 def _get_command_result_classes():
     """지연 임포트로 CommandResult 클래스들을 가져옵니다."""
@@ -34,15 +41,22 @@ def _get_command_result_classes():
 
 class MessageChunker:
     """메시지 분할 클래스"""
-    
-    def __init__(self, max_length: int = 240):
+
+    def __init__(self, max_length: int = None):
         """
         MessageChunker 초기화
-        
+
         Args:
-            max_length: 최대 글자 수 (기본값: 240)
+            max_length: 최대 글자 수 (None이면 설정에서 가져옴)
         """
-        self.max_length = max_length
+        if max_length is None:
+            # 설정에서 글자수 제한 가져오기
+            if config:
+                self.max_length = config.MAX_MESSAGE_LENGTH
+            else:
+                self.max_length = 500  # 기본값
+        else:
+            self.max_length = max_length
     
     def split_message(self, message: str) -> List[str]:
         """
@@ -223,7 +237,7 @@ class ThreadedMessageSender:
         """
         self.mastodon = mastodon_client
         self.delay = delay_between_messages
-        self.chunker = MessageChunker()
+        self.chunker = MessageChunker()  # 기본 설정에서 글자수 제한을 가져옴
     
     def send_reply(self, original_status_id: str, message: str, mention_user: str = None) -> List[Dict]:
         """

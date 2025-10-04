@@ -11,6 +11,17 @@ from datetime import datetime, timedelta
 from enum import Enum
 import pytz
 
+# 경로 설정 (VM 환경 대응)
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+
+try:
+    from config.settings import config
+except ImportError:
+    import logging
+    logging.warning("설정 파일을 불러올 수 없습니다. 기본값을 사용합니다.")
+    config = None
+
 try:
     from models.dynamic_command_types import DynamicCommandType as CommandType
 except ImportError:
@@ -56,17 +67,23 @@ class MessageChunker:
     """텍스트 분할 유틸리티 (명시적 분리)"""
     
     @staticmethod
-    def split_text_into_chunks(text: str, max_length: int = 400) -> List[str]:
+    def split_text_into_chunks(text: str, max_length: int = None) -> List[str]:
         """
         텍스트를 청크로 분할
-        
+
         Args:
             text: 분할할 텍스트
-            max_length: 최대 길이
-            
+            max_length: 최대 길이 (None이면 설정에서 가져옴)
+
         Returns:
             List[str]: 분할된 청크들
         """
+        if max_length is None:
+            # 설정에서 글자수 제한 가져오기
+            if config:
+                max_length = config.MAX_MESSAGE_LENGTH
+            else:
+                max_length = 500  # 기본값
         if not text:
             return []
         
@@ -486,7 +503,7 @@ class CommandResult:
     
     @classmethod
     def long_text(cls, command_type: CommandType, user_id: str, user_name: str,
-                  original_command: str, text: str, max_length: int = 400,
+                  original_command: str, text: str, max_length: int = None,
                   execution_time: float = None, **metadata) -> 'CommandResultGroup':
         """
         긴 텍스트 결과 생성 (그룹으로 반환)

@@ -94,8 +94,14 @@ class HTMLCleaner:
 
 class MentionManager:
     """멘션 관리 유틸리티 (길이 초과 방지)"""
-    
-    MAX_MENTION_LENGTH = 100  # 멘션 문자열 최대 길이
+
+    @staticmethod
+    def get_max_mention_length():
+        """설정에서 멘션 최대 길이 계산"""
+        if config:
+            # 전체 메시지 길이의 20% 정도를 멘션용으로 할당
+            return min(100, config.MAX_MESSAGE_LENGTH // 5)
+        return 100  # 기본값
     MAX_USERS_TO_MENTION = 5  # 최대 멘션할 사용자 수
     
     @staticmethod
@@ -117,14 +123,15 @@ class MentionManager:
         mentions = ' '.join([f"@{user}" for user in users_to_mention])
         
         # 길이 제한 확인
-        if len(mentions) > MentionManager.MAX_MENTION_LENGTH:
+        max_mention_length = MentionManager.get_max_mention_length()
+        if len(mentions) > max_mention_length:
             # 길이 초과 시 사용자 수 줄이기
             truncated_users = []
             current_length = 0
             
             for user in users_to_mention:
                 mention = f"@{user}"
-                if current_length + len(mention) + 1 > MentionManager.MAX_MENTION_LENGTH - 10:  # 여유 공간
+                if current_length + len(mention) + 1 > max_mention_length - 10:  # 여유 공간
                     break
                 truncated_users.append(user)
                 current_length += len(mention) + 1
@@ -487,7 +494,9 @@ class BotStreamHandler(mastodon.StreamListener):
             full_message = f"{mentions} {formatted_message}"
             message_length = len(full_message)
             
-            if message_length <= 220:
+            # 설정된 글자수 제한의 80% 이하면 단일 메시지로 전송
+            single_message_threshold = int((config.MAX_MESSAGE_LENGTH if config else 500) * 0.8)
+            if message_length <= single_message_threshold:
                 # 짧은 메시지: 단일 답장
                 self._send_status_with_retry(
                     status=full_message,
@@ -544,7 +553,9 @@ class BotStreamHandler(mastodon.StreamListener):
             # mentions + prefix 길이를 고려하여 chunker 설정 (여유분 포함)
             mentions_length = len(mentions) + 1  # 공백 포함
             prefix_length = len(config.RESPONSE_PREFIX) if config.RESPONSE_PREFIX else 0
-            safe_length = 250 - mentions_length - prefix_length - 10  # 10자 여유분
+            # 설정된 글자수 제한에서 mentions와 prefix 길이를 빼고 여유분 확보
+            max_msg_length = config.MAX_MESSAGE_LENGTH if config else 500
+            safe_length = max_msg_length - mentions_length - prefix_length - 10  # 10자 여유분
             chunker = MessageChunker(max_length=max(50, safe_length))  # 최소 50자 보장
             chunks = []
             
@@ -588,8 +599,8 @@ class BotStreamHandler(mastodon.StreamListener):
 
                     # 디버그: 실제 전송될 메시지 길이 확인
                     logger.debug(f"실제 전송 메시지 길이: {len(full_chunk)}자 - '{full_chunk[:100]}...'")
-                    if len(full_chunk) > 250:
-                        logger.warning(f"250자 초과 메시지 감지! {len(full_chunk)}자: '{full_chunk[:50]}...'")
+                    if len(full_chunk) > (config.MAX_MESSAGE_LENGTH if config else 500):
+                        logger.warning(f"{config.MAX_MESSAGE_LENGTH if config else 500}자 초과 메시지 감지! {len(full_chunk)}자: '{full_chunk[:50]}...'")
 
                     
                     status = self._send_status_with_retry(

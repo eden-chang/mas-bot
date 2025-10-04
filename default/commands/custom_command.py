@@ -1,7 +1,7 @@
 """
 커스텀 명령어 처리 모듈
 Google Sheets의 '커스텀' 워크시트에서 명령어와 문구를 읽어 처리합니다.
-15분 캐시를 지원하며, 명령어 매칭 시 띄어쓰기와 대소문자를 무시합니다.
+1시간 캐시를 지원하며, 명령어 매칭 시 띄어쓰기와 대소문자를 무시합니다.
 """
 
 import os
@@ -40,11 +40,12 @@ class CustomCommandManager:
         self.sheets_manager = None
         self._cache_key = "custom_commands"
         self._cache_expire_key = "custom_commands_expire"
-        self._cache_duration = 15 * 60  # 15분 (초 단위)
+        self._cache_duration = 60 * 60  # 1시간 (초 단위)
         
-        # 다이스 제한 설정
-        self.max_dice_count = 20
-        self.max_dice_sides = 1000
+        # 다이스 제한 설정 (설정에서 가져오기)
+        from config.settings import config
+        self.max_dice_count = config.MAX_DICE_COUNT if config else 20
+        self.max_dice_sides = config.MAX_DICE_SIDES if config else 1000
         
         try:
             self.sheets_manager = get_sheets_manager()
@@ -532,7 +533,7 @@ class CustomCommandManager:
     
     def _is_cache_valid(self) -> bool:
         """
-        캐시가 유효한지 확인 (15분 기준)
+        캐시가 유효한지 확인 (1시간 기준)
         
         Returns:
             bool: 캐시 유효성 여부
@@ -621,7 +622,7 @@ class CustomCommandManager:
         logger.debug("시트에서 커스텀 명령어 데이터 로드")
         commands = self._load_custom_commands_from_sheet()
         
-        # 캐시에 저장 (15분 TTL)
+        # 캐시에 저장 (1시간 TTL)
         current_time = time.time()
         expire_time = current_time + self._cache_duration
         

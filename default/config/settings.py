@@ -86,6 +86,9 @@ class Config:
     # 프리미엄 기능 설정 (+5000원)
     PREMIUM_CUSTOMC_ENABLED: bool = os.getenv('PREMIUM_CUSTOMC_ENABLED', 'False').lower() == 'true'
     
+    # 메시지 설정
+    MAX_MESSAGE_LENGTH: int = int(os.getenv('MAX_MESSAGE_LENGTH', '500'))
+
     # 개발/디버그 설정
     DEBUG_MODE: bool = os.getenv('DEBUG_MODE', 'False').lower() == 'true'
     ENABLE_CONSOLE_LOG: bool = os.getenv('ENABLE_CONSOLE_LOG', 'True').lower() == 'true'
