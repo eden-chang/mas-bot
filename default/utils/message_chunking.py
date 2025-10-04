@@ -35,12 +35,12 @@ def _get_command_result_classes():
 class MessageChunker:
     """메시지 분할 클래스"""
     
-    def __init__(self, max_length: int = 430):
+    def __init__(self, max_length: int = 240):
         """
         MessageChunker 초기화
         
         Args:
-            max_length: 최대 글자 수 (기본값: 490)
+            max_length: 최대 글자 수 (기본값: 240)
         """
         self.max_length = max_length
     
@@ -225,14 +225,15 @@ class ThreadedMessageSender:
         self.delay = delay_between_messages
         self.chunker = MessageChunker()
     
-    def send_reply(self, original_status_id: str, message: str) -> List[Dict]:
+    def send_reply(self, original_status_id: str, message: str, mention_user: str = None) -> List[Dict]:
         """
         단일 또는 스레드 답장 전송
-        
+
         Args:
             original_status_id: 원본 툿 ID
             message: 전송할 메시지
-            
+            mention_user: 멘션할 사용자 (없으면 멘션 안함)
+
         Returns:
             List[Dict]: 전송된 툿들의 정보
         """
@@ -241,16 +242,17 @@ class ThreadedMessageSender:
             return self._send_single_reply(original_status_id, message)
         else:
             # 긴 메시지는 스레드로 전송
-            return self._send_threaded_reply(original_status_id, message)
+            return self._send_threaded_reply(original_status_id, message, mention_user)
     
-    def send_command_result(self, original_status_id: str, result: 'CommandResult') -> List[Dict]:
+    def send_command_result(self, original_status_id: str, result: 'CommandResult', mention_user: str = None) -> List[Dict]:
         """
         명령어 결과를 적절한 방식으로 전송
-        
+
         Args:
             original_status_id: 원본 툿 ID
             result: 명령어 결과
-            
+            mention_user: 멘션할 사용자 (없으면 멘션 안함)
+
         Returns:
             List[Dict]: 전송된 툿들의 정보
         """
@@ -258,12 +260,12 @@ class ThreadedMessageSender:
         if hasattr(result, 'result_data'):
             _, ShopResult, InventoryResult = _get_command_result_classes()
             if ShopResult and isinstance(result.result_data, ShopResult):
-                return self._send_shop_result(original_status_id, result.result_data)
+                return self._send_shop_result(original_status_id, result.result_data, mention_user)
             elif InventoryResult and isinstance(result.result_data, InventoryResult):
-                return self._send_inventory_result(original_status_id, result.result_data)
-        
+                return self._send_inventory_result(original_status_id, result.result_data, mention_user)
+
         # 기본 메시지 전송
-        return self.send_reply(original_status_id, result.message)
+        return self.send_reply(original_status_id, result.message, mention_user)
     
     def _send_single_reply(self, original_status_id: str, message: str) -> List[Dict]:
         """단일 답장 전송"""
@@ -279,52 +281,56 @@ class ThreadedMessageSender:
             logger.error(f"단일 답장 전송 실패: {e}")
             return []
     
-    def _send_threaded_reply(self, original_status_id: str, message: str) -> List[Dict]:
+    def _send_threaded_reply(self, original_status_id: str, message: str, mention_user: str = None) -> List[Dict]:
         """스레드 답장 전송"""
         chunks = self.chunker.split_message(message)
-        return self._send_chunks(original_status_id, chunks)
+        return self._send_chunks(original_status_id, chunks, mention_user)
     
-    def _send_shop_result(self, original_status_id: str, shop_result: 'ShopResult') -> List[Dict]:
+    def _send_shop_result(self, original_status_id: str, shop_result: 'ShopResult', mention_user: str = None) -> List[Dict]:
         """상점 결과 전송"""
         chunks = self.chunker.split_shop_items(shop_result.items, shop_result.currency_unit)
         logger.info(f"상점 목록을 {len(chunks)}개 청크로 분할")
-        return self._send_chunks(original_status_id, chunks)
-    
-    def _send_inventory_result(self, original_status_id: str, inventory_result: 'InventoryResult') -> List[Dict]:
+        return self._send_chunks(original_status_id, chunks, mention_user)
+
+    def _send_inventory_result(self, original_status_id: str, inventory_result: 'InventoryResult', mention_user: str = None) -> List[Dict]:
         """인벤토리 결과 전송"""
         chunks = self.chunker.split_inventory_items(
-            inventory_result.inventory, 
-            inventory_result.user_name, 
+            inventory_result.inventory,
+            inventory_result.user_name,
             inventory_result.suffix
         )
         logger.info(f"인벤토리를 {len(chunks)}개 청크로 분할")
-        return self._send_chunks(original_status_id, chunks)
+        return self._send_chunks(original_status_id, chunks, mention_user)
     
-    def _send_chunks(self, original_status_id: str, chunks: List[str]) -> List[Dict]:
+    def _send_chunks(self, original_status_id: str, chunks: List[str], mention_user: str = None) -> List[Dict]:
         """청크 리스트를 순차적으로 전송"""
         sent_statuses = []
         reply_to_id = original_status_id
-        
+
         for i, chunk in enumerate(chunks):
             try:
                 logger.debug(f"청크 {i+1}/{len(chunks)} 전송 중... ({len(chunk)}자)")
-                
+
+                # 두 번째 메시지부터 멘션 추가 (첫 번째는 이미 원본에 답장이므로 멘션이 자동으로 감)
+                if i > 0 and mention_user:
+                    chunk = f"@{mention_user} {chunk}"
+
                 status = self.mastodon.status_reply(
                     to_status=reply_to_id,
                     status=chunk
                 )
-                
+
                 sent_statuses.append(status)
                 reply_to_id = status['id']  # 다음 답장은 방금 보낸 툿에 연결
-                
+
                 # API 제한 고려하여 대기 (마지막 제외)
                 if i < len(chunks) - 1:
                     time.sleep(self.delay)
-                
+
             except Exception as e:
                 logger.error(f"청크 {i+1} 전송 실패: {e}")
                 break
-        
+
         logger.info(f"스레드 답장 완료: {len(sent_statuses)}/{len(chunks)}개 툿 전송")
         return sent_statuses
 
@@ -354,39 +360,41 @@ def get_message_sender() -> Optional[ThreadedMessageSender]:
     return _global_message_sender
 
 
-def send_bot_reply(original_status_id: str, message: str) -> List[Dict]:
+def send_bot_reply(original_status_id: str, message: str, mention_user: str = None) -> List[Dict]:
     """
     편의 함수: 봇 답장 전송
-    
+
     Args:
         original_status_id: 원본 툿 ID
         message: 전송할 메시지
-        
+        mention_user: 멘션할 사용자 (없으면 멘션 안함)
+
     Returns:
         List[Dict]: 전송된 툿들의 정보
     """
     sender = get_message_sender()
     if sender:
-        return sender.send_reply(original_status_id, message)
+        return sender.send_reply(original_status_id, message, mention_user)
     else:
         logger.error("메시지 전송기가 초기화되지 않았습니다.")
         return []
 
 
-def send_command_result(original_status_id: str, result: 'CommandResult') -> List[Dict]:
+def send_command_result(original_status_id: str, result: 'CommandResult', mention_user: str = None) -> List[Dict]:
     """
     편의 함수: 명령어 결과 전송
-    
+
     Args:
         original_status_id: 원본 툿 ID
         result: 명령어 결과
-        
+        mention_user: 멘션할 사용자 (없으면 멘션 안함)
+
     Returns:
         List[Dict]: 전송된 툿들의 정보
     """
     sender = get_message_sender()
     if sender:
-        return sender.send_command_result(original_status_id, result)
+        return sender.send_command_result(original_status_id, result, mention_user)
     else:
         logger.error("메시지 전송기가 초기화되지 않았습니다.")
         return []

@@ -487,7 +487,7 @@ class BotStreamHandler(mastodon.StreamListener):
             full_message = f"{mentions} {formatted_message}"
             message_length = len(full_message)
             
-            if message_length <= 490:
+            if message_length <= 220:
                 # 짧은 메시지: 단일 답장
                 self._send_status_with_retry(
                     status=full_message,
@@ -526,14 +526,14 @@ class BotStreamHandler(mastodon.StreamListener):
     
     def _send_threaded_response(self, original_status_id: str, command_result, visibility: str, mentions: str) -> List[Dict]:
         """
-        스레드 형태로 긴 응답 전송 (첫 번째 툿에만 멘션 포함)
-        
+        스레드 형태로 긴 응답 전송 (모든 툿에 멘션 포함)
+
         Args:
             original_status_id: 원본 툿 ID
             command_result: 명령어 결과
             visibility: 공개 범위
             mentions: 멘션 문자열 (@user1 @user2 ...)
-            
+
         Returns:
             List[Dict]: 전송된 툿들의 정보
         """
@@ -541,7 +541,11 @@ class BotStreamHandler(mastodon.StreamListener):
             # 메시지 분할기 import
             from utils.message_chunking import MessageChunker
             
-            chunker = MessageChunker(max_length=430)
+            # mentions + prefix 길이를 고려하여 chunker 설정 (여유분 포함)
+            mentions_length = len(mentions) + 1  # 공백 포함
+            prefix_length = len(config.RESPONSE_PREFIX) if config.RESPONSE_PREFIX else 0
+            safe_length = 250 - mentions_length - prefix_length - 10  # 10자 여유분
+            chunker = MessageChunker(max_length=max(50, safe_length))  # 최소 50자 보장
             chunks = []
             
             # 결과 타입별 특별 처리
@@ -576,11 +580,17 @@ class BotStreamHandler(mastodon.StreamListener):
                     logger.debug(f"청크 {i+1}/{len(chunks)} 전송 중... ({len(chunk)}자)")
                     
                     formatted_chunk = config.format_response(chunk)
-                    # 첫 번째 청크에만 멘션 포함
-                    if i == 0:
+                    # 모든 청크에 멘션 포함 (두 번째부터도 멘션이 와야 함)
+                    if mentions.strip():
                         full_chunk = f"{mentions} {formatted_chunk}"
                     else:
                         full_chunk = formatted_chunk
+
+                    # 디버그: 실제 전송될 메시지 길이 확인
+                    logger.debug(f"실제 전송 메시지 길이: {len(full_chunk)}자 - '{full_chunk[:100]}...'")
+                    if len(full_chunk) > 250:
+                        logger.warning(f"250자 초과 메시지 감지! {len(full_chunk)}자: '{full_chunk[:50]}...'")
+
                     
                     status = self._send_status_with_retry(
                         status=full_chunk,

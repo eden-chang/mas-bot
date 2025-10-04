@@ -197,6 +197,122 @@ class CustomCommandManager:
         
         return rolls, final_result
     
+    def _process_random_substitutions(self, text: str, user_name: str) -> str:
+        """
+        랜덤 변수 치환 처리 ({random:A,B,C} 형태)
+
+        Args:
+            text: 처리할 텍스트
+            user_name: 사용자 이름 (중첩 변수 처리용)
+
+        Returns:
+            str: 랜덤 변수가 치환된 텍스트
+        """
+        if not text:
+            return text
+
+        # 프리미엄 기능 활성화 여부 확인
+        if not config.PREMIUM_CUSTOMC_ENABLED:
+            logger.debug("프리미엄 기능이 비활성화되어 있음. 랜덤 변수를 그대로 유지합니다.")
+            return text
+
+        # {random:옵션1,옵션2,옵션3} 또는 {랜덤:옵션1,옵션2,옵션3} 패턴 찾기
+        # 중첩된 중괄호를 처리하기 위해 수동 파싱 사용
+        def find_random_patterns(text):
+            """중첩된 중괄호를 고려하여 랜덤 패턴을 찾는 함수"""
+            patterns = []
+            start = 0
+
+            while True:
+                # random: 또는 랜덤: 찾기
+                random_start = text.find('{random:', start)
+                korean_start = text.find('{랜덤:', start)
+
+                if random_start == -1 and korean_start == -1:
+                    break
+
+                # 더 앞에 있는 것 선택
+                if random_start == -1:
+                    pattern_start = korean_start
+                    keyword_len = 4  # '{랜덤:'
+                elif korean_start == -1:
+                    pattern_start = random_start
+                    keyword_len = 8  # '{random:'
+                else:
+                    if random_start < korean_start:
+                        pattern_start = random_start
+                        keyword_len = 8
+                    else:
+                        pattern_start = korean_start
+                        keyword_len = 4
+
+                # 중괄호 균형 맞추기
+                brace_count = 1
+                i = pattern_start + keyword_len
+
+                while i < len(text) and brace_count > 0:
+                    if text[i] == '{':
+                        brace_count += 1
+                    elif text[i] == '}':
+                        brace_count -= 1
+                    i += 1
+
+                if brace_count == 0:
+                    # 완전한 패턴 발견
+                    full_pattern = text[pattern_start:i]
+                    content = text[pattern_start + keyword_len:i-1]
+                    patterns.append((pattern_start, i, full_pattern, content))
+
+                start = pattern_start + 1
+
+            return patterns
+
+        # 랜덤 패턴들을 찾아서 처리
+        max_iterations = 10  # 무한 루프 방지
+        iteration = 0
+
+        while iteration < max_iterations:
+            patterns = find_random_patterns(text)
+            if not patterns:
+                break
+
+            # 뒤에서부터 치환 (인덱스 변화 방지)
+            for start_pos, end_pos, full_pattern, content in reversed(patterns):
+                try:
+                    # 콤마로 옵션들 분리
+                    options = [option.strip() for option in content.split(',')]
+
+                    if not options:
+                        logger.warning(f"빈 랜덤 옵션: {full_pattern}")
+                        continue
+
+                    # 랜덤으로 하나 선택
+                    selected_option = random.choice(options)
+
+                    # 선택된 옵션에서 {시전자} 먼저 치환
+                    processed_option = selected_option.replace('{시전자}', user_name)
+
+                    # 그 다음 다른 변수들 처리 (다이스, 한국어 조사)
+                    # 무한 재귀 방지를 위해 랜덤 변수를 제외한 기본 처리만 수행
+                    processed_option = self._process_josa_directly(processed_option)
+                    processed_option = self._process_dice_in_text(processed_option)
+
+                    logger.debug(f"랜덤 변수 치환: {full_pattern} -> '{selected_option}' -> '{processed_option}'")
+
+                    # 텍스트에서 해당 부분 치환
+                    text = text[:start_pos] + processed_option + text[end_pos:]
+
+                except Exception as e:
+                    logger.warning(f"랜덤 변수 처리 실패 ({full_pattern}): {e}")
+                    continue
+
+            iteration += 1
+
+        if iteration >= max_iterations:
+            logger.warning(f"랜덤 변수 처리 최대 반복 횟수 초과: {text}")
+
+        return text
+
     def _process_dice_in_text(self, text: str) -> str:
         """
         텍스트에서 다이스 표기법을 실제 결과로 치환 (프리미엄 기능 +5000원)
@@ -247,70 +363,171 @@ class CustomCommandManager:
     def _process_korean_substitutions(self, text: str, user_name: str) -> str:
         """
         한국어 치환 처리 ({시전자} 및 조사 처리) - 프리미엄 기능 (+5000원)
-        
+
         프리미엄 기능이 비활성화된 경우 모든 괄호 표기법을 그대로 유지합니다.
-        
+
         Args:
             text: 처리할 텍스트
             user_name: 사용자 이름
-            
+
         Returns:
             str: 한국어 치환이 완료된 텍스트 (프리미엄 활성화 시) 또는 원본 텍스트
         """
         if not text:
             return text
-        
+
         # 프리미엄 기능 활성화 여부 확인
         if not config.PREMIUM_CUSTOMC_ENABLED:
             logger.debug("프리미엄 기능이 비활성화되어 있음. 모든 괄호 표기법을 그대로 유지합니다.")
             return text
-        
+
         # 먼저 {시전자}를 실제 사용자 이름으로 치환
         processed_text = text.replace('{시전자}', user_name)
-        
-        # 한국어 조사 처리
+
+        # 한국어 조사 처리 - 이미 치환된 텍스트에서 조사 패턴 직접 처리
         try:
-            # format_korean 함수를 사용하여 조사 자동 처리
-            processed_text = format_korean(processed_text, 시전자=user_name)
-            
+            processed_text = self._process_josa_directly(processed_text)
+
             logger.debug(f"프리미엄 한국어 치환: '{text}' -> '{processed_text}'")
-            
+
         except Exception as e:
             logger.warning(f"프리미엄 한국어 조사 처리 실패: {e}")
             # 실패 시 최소한 {시전자}만 치환된 상태로 반환
-        
+
         return processed_text
+
+    def _process_josa_directly(self, text: str) -> str:
+        """
+        텍스트에서 조사를 직접 처리하는 함수
+        이미 치환된 단어 뒤에 있는 조사 패턴을 찾아서 적절한 조사로 변경
+
+        Args:
+            text: 처리할 텍스트
+
+        Returns:
+            str: 조사가 처리된 텍스트
+        """
+        if not text:
+            return text
+
+        # 조사 패턴들과 해당하는 조사 매핑
+        josa_patterns = {
+            r'(\S)(\{은는\})': lambda char: '은' if self._has_final_consonant(char) else '는',
+            r'(\S)(\{이가\})': lambda char: '이' if self._has_final_consonant(char) else '가',
+            r'(\S)(\{을를\})': lambda char: '을' if self._has_final_consonant(char) else '를',
+            r'(\S)(\{과와\})': lambda char: '과' if self._has_final_consonant(char) else '와',
+            r'(\S)(\{아야\})': lambda char: '아' if self._has_final_consonant(char) else '야',
+            r'(\S)(\{으로로\})': lambda char: '으로' if self._has_final_consonant(char) else '로'
+        }
+
+        result = text
+
+        for pattern, josa_func in josa_patterns.items():
+            def replace_josa(match):
+                word_char = match.group(1)
+                josa = josa_func(word_char)
+                return word_char + josa
+
+            result = re.sub(pattern, replace_josa, result)
+
+        return result
+
+    def _has_final_consonant(self, char: str) -> bool:
+        """
+        한글 문자의 받침(종성) 여부 판단
+
+        Args:
+            char: 한글 문자 1개
+
+        Returns:
+            bool: 받침이 있으면 True, 없으면 False
+        """
+        if not char:
+            return False
+
+        # 한글이 아닌 경우 (숫자, 영문, 기호 등)
+        if not ('가' <= char <= '힣'):
+            # 숫자나 영문의 경우 발음을 기준으로 판단
+            if char.isdigit():
+                # 숫자별 받침 여부: 1,7,8 = 받침 있음, 나머지 = 받침 없음
+                return char in '178'
+            elif char.isalpha():
+                # 영문의 경우 발음을 기준으로 (간단한 규칙)
+                # L, M, N, R = 받침 있음으로 처리
+                return char.upper() in 'LMNR'
+            else:
+                # 기타 문자는 받침 없음으로 처리
+                return False
+
+        # 한글의 경우: 유니코드 계산으로 종성 확인
+        code = ord(char) - ord('가')
+        final_consonant = code % 28  # 종성 인덱스 (0이면 받침 없음)
+
+        return final_consonant != 0
     
     def _process_all_substitutions(self, text: str, user_name: str) -> str:
         """
-        모든 치환 처리 (다이스 + 한국어) - 프리미엄 기능 (+5000원)
-        
+        모든 치환 처리 (랜덤 + 다이스 + 한국어) - 프리미엄 기능 (+5000원)
+
         프리미엄 기능이 비활성화된 경우 모든 괄호 표기법을 원본 그대로 유지합니다.
-        
+
         Args:
             text: 처리할 텍스트
             user_name: 사용자 이름
-            
+
         Returns:
             str: 모든 치환이 완료된 텍스트 (프리미엄 활성화 시) 또는 원본 텍스트
         """
         if not text:
             return text
-        
+
         # 프리미엄 기능 비활성화 시 원본 그대로 반환
         if not config.PREMIUM_CUSTOMC_ENABLED:
             logger.debug(f"프리미엄 기능 비활성화: 원본 텍스트 그대로 반환 - '{text}'")
             return text
-        
+
         # 프리미엄 기능 활성화 시 모든 치환 처리
         # 1. 한국어 치환 처리 ({시전자} 및 조사)
         processed_text = self._process_korean_substitutions(text, user_name)
-        
+
         # 2. 다이스 치환 처리
         processed_text = self._process_dice_in_text(processed_text)
-        
+
         logger.debug(f"프리미엄 모든 치환 완료: '{text}' -> '{processed_text}'")
-        
+
+        return processed_text
+
+    def _process_all_substitutions_with_random(self, text: str, user_name: str) -> str:
+        """
+        랜덤 변수를 포함한 모든 치환 처리 (랜덤 + 다이스 + 한국어) - 프리미엄 기능
+
+        Args:
+            text: 처리할 텍스트
+            user_name: 사용자 이름
+
+        Returns:
+            str: 모든 치환이 완료된 텍스트
+        """
+        if not text:
+            return text
+
+        # 프리미엄 기능 비활성화 시 원본 그대로 반환
+        if not config.PREMIUM_CUSTOMC_ENABLED:
+            logger.debug(f"프리미엄 기능 비활성화: 원본 텍스트 그대로 반환 - '{text}'")
+            return text
+
+        # 프리미엄 기능 활성화 시 모든 치환 처리
+        # 1. 랜덤 변수 치환 처리 (이 과정에서 내부적으로 다른 변수들도 재귀 처리됨)
+        processed_text = self._process_random_substitutions(text, user_name)
+
+        # 2. 남은 한국어 치환 처리 (랜덤 처리 후 남은 {시전자} 등)
+        processed_text = self._process_korean_substitutions(processed_text, user_name)
+
+        # 3. 남은 다이스 치환 처리
+        processed_text = self._process_dice_in_text(processed_text)
+
+        logger.debug(f"프리미엄 모든 치환 (랜덤 포함) 완료: '{text}' -> '{processed_text}'")
+
         return processed_text
     
     def _is_cache_valid(self) -> bool:
@@ -470,8 +687,8 @@ class CustomCommandManager:
         # 랜덤 문구 선택
         selected_phrase = random.choice(phrases)
         
-        # 모든 치환 처리 (한국어 + 다이스)
-        processed_phrase = self._process_all_substitutions(selected_phrase, user_name)
+        # 모든 치환 처리 (랜덤 + 한국어 + 다이스)
+        processed_phrase = self._process_all_substitutions_with_random(selected_phrase, user_name)
         
         logger.debug(f"커스텀 명령어 '{command}' 실행 (사용자: {user_name}): '{selected_phrase[:50]}...' -> '{processed_phrase[:50]}...'")
         
@@ -665,32 +882,64 @@ def process_korean_in_custom_text(text: str, user_name: str) -> str:
 
 def process_all_custom_substitutions(text: str, user_name: str) -> str:
     """
-    커스텀 텍스트의 모든 치환 처리 (다이스 + 한국어, 독립 함수)
-    
+    커스텀 텍스트의 모든 치환 처리 (랜덤 + 다이스 + 한국어, 독립 함수)
+
     Args:
         text: 처리할 텍스트
         user_name: 사용자 이름
-        
+
     Returns:
         str: 모든 치환이 완료된 텍스트
     """
     manager = get_custom_command_manager()
-    return manager._process_all_substitutions(text, user_name)
+    return manager._process_all_substitutions_with_random(text, user_name)
+
+
+def process_random_in_custom_text(text: str, user_name: str) -> str:
+    """
+    커스텀 텍스트의 랜덤 변수 치환 처리 (독립 함수)
+
+    Args:
+        text: 처리할 텍스트
+        user_name: 사용자 이름
+
+    Returns:
+        str: 랜덤 변수가 치환된 텍스트
+    """
+    manager = get_custom_command_manager()
+    return manager._process_random_substitutions(text, user_name)
+
+
+def has_random_substitutions(text: str) -> bool:
+    """
+    텍스트에 랜덤 변수가 포함되어 있는지 확인
+
+    Args:
+        text: 확인할 텍스트
+
+    Returns:
+        bool: 랜덤 변수 포함 여부
+    """
+    if not text:
+        return False
+
+    random_pattern = re.compile(r'\{(?:random|랜덤):[^}]+\}')
+    return bool(random_pattern.search(text))
 
 
 def has_korean_substitutions(text: str) -> bool:
     """
     텍스트에 한국어 치환 요소가 포함되어 있는지 확인
-    
+
     Args:
         text: 확인할 텍스트
-        
+
     Returns:
         bool: 한국어 치환 요소 포함 여부
     """
     if not text:
         return False
-    
+
     # {시전자} 또는 조사 패턴 확인
     korean_patterns = [
         r'\{시전자\}',
@@ -701,11 +950,11 @@ def has_korean_substitutions(text: str) -> bool:
         r'\{아야\}',
         r'\{으로로\}'
     ]
-    
+
     for pattern in korean_patterns:
         if re.search(pattern, text):
             return True
-    
+
     return False
 
 
@@ -759,10 +1008,27 @@ if __name__ == "__main__":
             processed = manager._process_all_substitutions(text, user)
             print(f"'{text}' (사용자: {user}) -> '{processed}'")
     
+    # 랜덤 변수 테스트
+    print("\n=== 랜덤 변수 테스트 ===")
+    random_test_texts = [
+        "{시전자}{은는} {random:가방,옷,신발}{을를} 획득했다! 가격은 {2d10} 코인이다.",
+        "{random:{시전자},엘런,유리}{이가} {random:{1d100}점,50점,{2d6+5}점}의 피해를 입혔다.",
+        "오늘의 날씨는 {랜덤:맑음,흐림,비,눈}입니다.",
+        "{랜덤:안녕하세요,안녕,반갑습니다}, {시전자}님!",
+        "능력치: {랜덤:힘 {1d6},민첩 {1d8},지능 {1d10}}",
+        "{시전자}{은는} {랜덤:사과,바나나,오렌지}{을를} 먹었습니다."
+    ]
+
+    for text in random_test_texts:
+        for user in ["철수", "영희"]:
+            processed = manager._process_all_substitutions_with_random(text, user)
+            print(f"'{text}' (사용자: {user}) -> '{processed}'")
+
     # 포함 여부 확인 테스트
     print("\n=== 포함 여부 테스트 ===")
-    all_test_texts = dice_test_texts + korean_test_texts
+    all_test_texts = dice_test_texts + korean_test_texts + random_test_texts
     for text in all_test_texts:
         has_dice = has_dice_expressions(text)
         has_korean = has_korean_substitutions(text)
-        print(f"'{text}' -> 다이스: {has_dice}, 한국어: {has_korean}")
+        has_random = has_random_substitutions(text)
+        print(f"'{text}' -> 다이스: {has_dice}, 한국어: {has_korean}, 랜덤: {has_random}")
